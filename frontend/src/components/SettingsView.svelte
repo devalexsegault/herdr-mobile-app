@@ -453,7 +453,7 @@
 </script>
 
 <main class="page settings-page" aria-labelledby="settings-title">
-  <h2 id="settings-title">Settings</h2>
+  <h2 id="settings-title" class="sr-only">Settings</h2>
 
   <Card>
     <h3>Relays</h3>
@@ -520,14 +520,14 @@
               >Update Help</Button>
             {:else if connection?.capabilities.includes('self_update')}
               <Button
-                variant="secondary"
+                variant="ghost"
                 size="sm"
                 disabled={connectionStatus !== 'connected' || busyRelayId === relay.id || ['scheduled', 'preparing', 'deploying_app', 'installing', 'restarting'].includes(connection.update.state)}
                 aria-label={`Check ${relay.label} for updates`}
                 onclick={() => checkRelayUpdate(relay.id)}
               >Check</Button>
             {/if}
-            <Button variant="danger" size="sm" aria-label={`Remove ${relay.label}`} onclick={() => requestRelayRemoval(relay.id)}>Remove</Button>
+            <Button variant="ghost" size="sm" class="relay-remove" aria-label={`Remove ${relay.label}`} onclick={() => requestRelayRemoval(relay.id)}>Remove</Button>
           </div>
         </article>
       {/each}
@@ -740,7 +740,7 @@
   {/if}
   <p>Agents on the computer keep running. You will need its setup link or connection details to add it again.</p>
   <div class="dialog-actions">
-    <Button variant="danger" disabled={!removalRow} onclick={confirmRelayRemoval}>Remove Relay</Button>
+    <Button variant="danger" class="button-confirm" disabled={!removalRow} onclick={confirmRelayRemoval}>Remove Relay</Button>
     <Button variant="ghost" onclick={() => { removalOpen = false; }}>Cancel</Button>
   </div>
 </AppDialog>

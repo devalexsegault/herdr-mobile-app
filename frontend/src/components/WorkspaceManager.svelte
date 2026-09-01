@@ -590,11 +590,11 @@
       {/if}
       <div class="workspace-management-actions">
         <Button size="sm" disabled={busy || !(workspace.cwd || workspace.worktree?.checkout_path)} onclick={() => startAgent(workspace)}>Start Agent</Button>
-        <Button size="sm" variant="secondary" disabled={busy} onclick={() => beginRename(workspace)}>Rename</Button>
+        <Button size="sm" variant="ghost" disabled={busy} onclick={() => beginRename(workspace)}>Rename</Button>
         {#if !workspace.worktree?.is_linked_worktree}
           <Button
             size="sm"
-            variant="secondary"
+            variant="ghost"
             disabled={busy || !worktreeManagementAvailable}
             title={worktreeManagementAvailable ? undefined : 'This relay does not support worktree management'}
             onclick={() => showWorktrees(workspace)}
@@ -618,28 +618,28 @@
 <main class="page workspace-manager-page" aria-labelledby="workspace-manager-title">
   <div class="workspace-manager-heading">
     <div>
-      <h2 id="workspace-manager-title">Workspaces</h2>
+      <h2 id="workspace-manager-title" class="sr-only">Workspaces</h2>
       <p>Manage Herdr workspaces and their Git worktrees without changing desktop focus.</p>
     </div>
   </div>
 
-  <Card>
-    <div class="form-stack">
+  <!-- Which computer, and one way to add to it: two near-empty cards became one
+       row, so the page opens on the workspaces themselves. -->
+  <div class="workspace-scope">
+    <div class="workspace-scope-field">
       <label for="workspace-relay">Computer</label>
       <select id="workspace-relay" bind:value={relayId}>
         {#if !readyRelays.length}<option value="">No compatible relays</option>{/if}
         {#each readyRelays as relay (relay.id)}<option value={relay.id}>{relay.label}</option>{/each}
       </select>
     </div>
-  </Card>
-
-  <Card>
     <Button
       class="workspace-create-button"
+      variant="secondary"
       disabled={!relayId || busy}
       onclick={openCreateWorkspace}
-    >Create Workspace</Button>
-  </Card>
+    >New workspace</Button>
+  </div>
 
   <section class="workspace-management-list" aria-label="Herdr workspaces">
     {#if relayId && !relayWorkspaces.length}
@@ -783,7 +783,7 @@
     : 'Every pane in this workspace will close. Git checkouts are not removed.'}
 >
   <div class="button-row">
-    <Button variant="danger" disabled={busy} onclick={confirmAction}>
+    <Button variant="danger" class="button-confirm" disabled={busy} onclick={confirmAction}>
       {confirming?.kind === 'remove' ? confirming.force ? 'Force Remove' : 'Remove Worktree' : 'Close Workspace'}
     </Button>
     <Button variant="ghost" disabled={busy} onclick={cancelConfirm}>Cancel</Button>

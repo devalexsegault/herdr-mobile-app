@@ -435,7 +435,7 @@ test('manages workspace modals, grouped worktrees, and drag ordering', async ({ 
     },
   });
 
-  await page.getByRole('button', { name: 'Create Workspace' }).click();
+  await page.getByRole('button', { name: 'New workspace' }).click();
   const createDialog = page.locator('#workspace-create-dialog');
   await expect(createDialog.getByRole('heading', { name: 'Create Workspace' })).toBeVisible();
   await createDialog.getByLabel('Label').fill('Phone Workspace');
@@ -679,23 +679,23 @@ test('keeps activity cards inside the page and confirms permanent deletion', asy
   await expect(page.locator('.activity-summary-metrics > div').filter({ hasText: 'Completed' })).toContainText('1');
   await expect(activity).toBeVisible();
   await expect(page.getByRole('button', { name: /omp working/ })).toHaveCount(0);
-  const headingBox = await page.getByRole('heading', { name: 'Activity', level: 2 }).boundingBox();
-  const deleteBox = await page.getByRole('button', { name: 'Delete all' }).boundingBox();
+  // Clearing the history is a quiet action at the top of the page; the list and
+  // its chevrons stay inside the viewport.
+  const clearBox = await page.getByRole('button', { name: 'Clear history' }).boundingBox();
   const box = await activity.boundingBox();
   const chevronBox = await activity.locator('.activity-chevron').boundingBox();
   const viewport = page.viewportSize();
-  expect(headingBox).not.toBeNull();
-  expect(deleteBox).not.toBeNull();
+  expect(clearBox).not.toBeNull();
   expect(box).not.toBeNull();
   expect(chevronBox).not.toBeNull();
   expect(viewport).not.toBeNull();
-  const headingCenter = headingBox!.y + headingBox!.height / 2;
-  const deleteCenter = deleteBox!.y + deleteBox!.height / 2;
-  expect(Math.abs(headingCenter - deleteCenter)).toBeLessThanOrEqual(2);
+  expect(viewport!.width - (clearBox!.x + clearBox!.width)).toBeGreaterThanOrEqual(8);
   expect(viewport!.width - (box!.x + box!.width)).toBeGreaterThanOrEqual(10);
-  expect(box!.x + box!.width - (chevronBox!.x + chevronBox!.width)).toBeGreaterThanOrEqual(10);
+  // Rows are hairline-separated now rather than padded cards, so the guard is
+  // against the screen edge, which is what it was protecting all along.
+  expect(viewport!.width - (chevronBox!.x + chevronBox!.width)).toBeGreaterThanOrEqual(10);
 
-  await page.getByRole('button', { name: 'Delete all' }).click();
+  await page.getByRole('button', { name: 'Clear history' }).click();
   const dialog = page.getByRole('dialog', { name: 'Delete all activity?' });
   await expect(dialog).toContainText('Running agents and their conversations are not affected.');
   await dialog.getByRole('button', { name: 'Delete all' }).click();

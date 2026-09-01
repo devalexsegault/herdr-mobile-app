@@ -30,7 +30,8 @@ describe('accessible Svelte interactions', () => {
     const clear = vi.spyOn(relayStore, 'clearActivities').mockResolvedValue();
     render(ActivityView);
 
-    await user.click(screen.getByRole('button', { name: 'Delete all' }));
+    // The trigger is a quiet action now; the dialog still owns the decision.
+    await user.click(screen.getByRole('button', { name: 'Clear history' }));
     const dialog = screen.getByRole('dialog', { name: 'Delete all activity?' });
     expect(dialog).toHaveTextContent('permanently deletes the activity history');
     expect(clear).not.toHaveBeenCalled();

@@ -152,10 +152,10 @@ html { background: var(--background); font-family: Inter, ui-sans-serif, system-
 :root[data-interface-size='regular'] { --composer-max-height: 10rem; --composer-min-height: 2.85rem; --composer-padding-block: .66rem; font-size: 16px; }
 :root[data-interface-size='large'] { --composer-max-height: 12rem; --composer-min-height: 3.05rem; --composer-padding-block: .76rem; font-size: 18px; }
 body { background: var(--background); color: var(--foreground); font-size: 1rem; overflow-x: hidden; }
-body[data-view='terminal'], body[data-view='history'] { overflow: hidden; }
+body[data-view='terminal'], body[data-view='history'], body[data-view='board'] { overflow: hidden; }
 /* Full-screen views pin the shell to the viewport and let flex size the body
    under the header, so no descendant needs a viewport unit. */
-body[data-view='terminal'] .app-shell, body[data-view='history'] .app-shell {
+body[data-view='terminal'] .app-shell, body[data-view='history'] .app-shell, body[data-view='board'] .app-shell {
   display: flex;
   flex-direction: column;
   inset: 0;
@@ -164,7 +164,7 @@ body[data-view='terminal'] .app-shell, body[data-view='history'] .app-shell {
   position: fixed;
   width: 100%;
 }
-body[data-view='terminal'] .app-header, body[data-view='history'] .app-header { flex: 0 0 auto; }
+body[data-view='terminal'] .app-header, body[data-view='history'] .app-header, body[data-view='board'] .app-header { flex: 0 0 auto; }
 /* iOS home-screen apps (measured on iOS 18.7 with the black-translucent status
    bar and viewport-fit=cover): the layout viewport that fixed boxes,
    percentages, dvh and svh resolve against is the screen minus the status-bar
@@ -175,8 +175,8 @@ body[data-view='terminal'] .app-header, body[data-view='history'] .app-header { 
    the shell in flow at 100vh and locks the document instead. Browser tabs keep
    the fixed shell, which tracks Safari's collapsing toolbars. */
 @media (display-mode: standalone) {
-  body[data-view='terminal'], body[data-view='history'] { height: 100vh; overscroll-behavior: none; }
-  body[data-view='terminal'] .app-shell, body[data-view='history'] .app-shell {
+  body[data-view='terminal'], body[data-view='history'], body[data-view='board'] { height: 100vh; overscroll-behavior: none; }
+  body[data-view='terminal'] .app-shell, body[data-view='history'] .app-shell, body[data-view='board'] .app-shell {
     height: 100vh;
     inset: auto;
     position: relative;
@@ -239,7 +239,11 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .button:active { transform: scale(.98); }
 .button:disabled { cursor: not-allowed; filter: grayscale(.35); opacity: .5; transform: none; }
 .button-secondary { background: var(--secondary); border-color: var(--border); color: var(--foreground); }
-.button-danger { background: var(--danger); color: #fff; }
+.button-danger { background: transparent; border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); color: var(--danger); }
+.button-danger:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); filter: none; }
+/* Kept solid for the second step of a confirmation, where the button IS the
+   decision. */
+.button-danger.button-confirm { background: var(--danger); border-color: transparent; color: #fff; }
 .button-trust { background: var(--trust); color: #fff; }
 .button-ghost { background: transparent; color: var(--foreground); }
 .button-sm { font-size: .78rem; min-height: 2.15rem; padding: .42rem .65rem; }
@@ -251,7 +255,9 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .card { background: var(--card); border: 1px solid var(--border); border-radius: .85rem; margin-bottom: .9rem; padding: 1rem; }
 .card h3 { font-size: .95rem; margin: 0 0 .8rem; }
 .form-stack { display: flex; flex-direction: column; gap: .5rem; }
-.form-stack label, .field-label { font-size: .78rem; font-weight: 650; }
+/* A field label names the field; it is not a heading. Same voice as the choice
+   legends, so a settings page reads as one system. */
+.form-stack label, .field-label { color: var(--muted); font-size: .72rem; font-weight: 650; letter-spacing: .03em; text-transform: uppercase; }
 input, select, textarea {
   background: var(--input);
   border: 1px solid var(--border);
@@ -320,18 +326,25 @@ textarea { min-height: 6.5rem; resize: vertical; }
 .responding { color: var(--muted); font-size: .72rem; margin: 0; padding: 0 .8rem .8rem; }
 
 .relay-list { border-top: 1px solid var(--border); margin-top: 1rem; }
-.relay-row { align-items: center; border-bottom: 1px solid var(--border); display: flex; gap: .65rem; padding: .75rem 0; }
-.relay-info { display: flex; flex: 1; flex-direction: column; min-width: 0; }
-.relay-info span, .relay-info small { color: var(--muted); font-size: .7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.relay-info ol { font-size: .7rem; margin: .15rem 0 .35rem 1rem; overflow-wrap: anywhere; padding: 0; }
-.relay-actions { display: flex; flex: 0 0 auto; flex-direction: column; gap: .3rem; }
+/* One computer, one line of facts: the name on its own, then the details as a
+   dot-separated run instead of a stack of six muted sentences. */
+.relay-row { align-items: flex-start; border-bottom: 1px solid var(--border); display: flex; gap: .65rem; padding: .85rem 0; }
+.relay-info { display: flex; flex: 1; flex-wrap: wrap; gap: .15rem .45rem; min-width: 0; }
+.relay-info strong { flex: 1 0 100%; font-size: .88rem; margin-bottom: .1rem; }
+.relay-info span, .relay-info small { color: var(--muted); font-size: .7rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.relay-info small + small::before, .relay-info span + small::before { color: color-mix(in srgb, var(--muted) 55%, transparent); content: '· '; }
+.relay-info ol { flex: 1 0 100%; font-size: .7rem; margin: .15rem 0 .35rem 1rem; overflow-wrap: anywhere; padding: 0; }
+.relay-actions { display: flex; flex: 0 0 auto; gap: .35rem; }
 .update-command { background: var(--input); border: 1px solid var(--border); border-radius: .55rem; font-size: .72rem; line-height: 1.5; overflow-wrap: anywhere; padding: .7rem; user-select: text; white-space: pre-wrap; }
 .checkout-update { border-top: 1px solid var(--border); margin-top: 1rem; padding-top: .85rem; }
 .checkout-update summary { cursor: pointer; font-size: .78rem; font-weight: 650; }
+/* A choice reads as one control: a quiet track, and the selection filled
+   rather than outlined, so the eye lands on the answer and not on five frames. */
 .choice-grid { border: 0; display: grid; gap: .4rem; grid-template-columns: repeat(5, 1fr); margin: 0 0 1rem; padding: 0; }
-.choice-grid legend { font-size: .78rem; font-weight: 650; margin-bottom: .45rem; }
-.choice-grid button { background: var(--secondary); border: 1px solid var(--border); border-radius: .55rem; color: var(--foreground); font-size: .68rem; min-height: 2.5rem; padding: .4rem; text-transform: capitalize; }
-.choice-grid button.active { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+.choice-grid legend { color: var(--muted); font-size: .72rem; font-weight: 650; letter-spacing: .03em; margin-bottom: .45rem; padding: 0; text-transform: uppercase; }
+.choice-grid button { background: color-mix(in srgb, var(--secondary) 55%, transparent); border: 1px solid transparent; border-radius: .7rem; color: var(--muted); cursor: pointer; font-size: .72rem; font-weight: 550; min-height: 2.5rem; padding: .4rem .25rem; text-transform: capitalize; }
+.choice-grid button:hover { color: var(--foreground); }
+.choice-grid button.active { background: color-mix(in srgb, var(--primary) 16%, var(--card)); border-color: color-mix(in srgb, var(--primary) 45%, var(--border)); color: var(--foreground); font-weight: 700; }
 .compact-grid { grid-template-columns: repeat(3, 1fr); }
 .history-grid { grid-template-columns: repeat(4, 1fr); }
 .refresh-grid button { text-transform: none; }
@@ -350,13 +363,14 @@ textarea { min-height: 6.5rem; resize: vertical; }
 .directory-list button { background: transparent; border: 0; border-bottom: 1px solid var(--border); color: var(--foreground); padding: .7rem; text-align: left; }
 .directory-list p { color: var(--muted); font-size: .75rem; margin: 0; padding: .8rem; }
 
-.activity-toolbar { align-items: center; display: flex; gap: .75rem; justify-content: space-between; margin-bottom: .8rem; }
+.activity-toolbar { align-items: center; display: flex; gap: .75rem; justify-content: flex-end; margin-bottom: .6rem; }
+.activity-toolbar :global(.button-ghost) { color: var(--muted); }
 .activity-toolbar h2 { margin: 0; }
 .activity-search { margin-bottom: .8rem; }
-.activity-summary { background: color-mix(in srgb, var(--primary) 7%, var(--card)); border: 1px solid color-mix(in srgb, var(--primary) 25%, var(--border)); border-radius: .8rem; margin-bottom: .8rem; overflow: hidden; }
+.activity-summary { background: var(--card); border: 1px solid var(--border); border-radius: .9rem; margin-bottom: .9rem; overflow: hidden; }
 .activity-summary > header { align-items: flex-start; display: flex; gap: .7rem; justify-content: space-between; padding: .75rem .8rem .5rem; }
-.activity-summary > header h3 { font-size: .82rem; margin: 0; }
-.activity-summary > header p, .activity-summary > header time { color: var(--muted); font-size: .6rem; margin: .12rem 0 0; }
+.activity-summary > header h3 { font-size: .88rem; margin: 0; }
+.activity-summary > header p, .activity-summary > header time { color: var(--muted); font-size: .68rem; margin: .12rem 0 0; }
 .activity-summary > header time { flex: 0 0 auto; }
 .activity-summary-metrics { display: grid; gap: 1px; grid-template-columns: repeat(4, 1fr); padding: 0 .55rem .65rem; }
 .activity-summary-metrics > div { align-items: center; background: color-mix(in srgb, var(--card) 70%, transparent); border-radius: .5rem; display: flex; flex-direction: column; min-width: 0; padding: .55rem .2rem; }
@@ -374,15 +388,19 @@ textarea { min-height: 6.5rem; resize: vertical; }
 .activity-summary-agents small, .activity-summary-agents > div > span:last-child { color: var(--muted); font-size: .58rem; }
 .activity-summary-agents > div > span:last-child { flex: 0 0 auto; font-variant-numeric: tabular-nums; }
 .activity-list { display: grid; gap: .55rem; min-width: 0; }
-.activity-item { background: var(--card); border: 1px solid var(--border); border-radius: .7rem; color: inherit; cursor: pointer; display: block; font: inherit; max-width: 100%; min-width: 0; overflow: hidden; padding: .75rem; text-align: left; width: 100%; }
-.activity-item:hover { border-color: var(--muted); }
-.activity-item:active { transform: scale(.995); }
+/* A history is a list, not a stack of boxes: hairlines separate the entries and
+   the page keeps one frame instead of one per row. */
+.activity-item { background: transparent; border: 0; border-top: 1px solid var(--border); border-radius: 0; color: inherit; cursor: pointer; display: block; font: inherit; max-width: 100%; min-width: 0; overflow: hidden; padding: .8rem .2rem; text-align: left; width: 100%; }
+.activity-list > .activity-item:first-of-type { border-top: 0; }
+.activity-item:hover { background: color-mix(in srgb, var(--card) 60%, transparent); }
+.activity-item:active { opacity: .8; }
 .activity-title { align-items: center; display: flex; gap: .45rem; }
-.activity-title strong { flex: 1; font-size: .82rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.activity-title time, .activity-item .activity-meta { color: var(--muted); font-size: .67rem; }
+.activity-title strong { flex: 1; font-size: .87rem; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.activity-title time, .activity-item .activity-meta { color: var(--muted); font-size: .7rem; }
+.activity-title time { font-variant-numeric: tabular-nums; }
 .activity-title time, .activity-chevron { flex: none; white-space: nowrap; }
 .activity-chevron { color: var(--muted); font-size: 1.1rem; line-height: 1; }
-.activity-item .activity-meta { display: block; margin: .35rem 0 0 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.activity-item .activity-meta { display: block; margin: .2rem 0 0 1.05rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .activity-detail { display: grid; gap: .7rem; }
 .activity-detail-head { align-items: center; display: flex; gap: .5rem; }
@@ -1171,7 +1189,7 @@ textarea { min-height: 6.5rem; resize: vertical; }
 /* --- Board --------------------------------------------------------------
    Columns scroll horizontally, one full column plus the edge of the next, so
    the board reads as a pipeline rather than a wall of shrunken lanes. */
-.board-view { display: flex; flex-direction: column; gap: .8rem; padding: .9rem 0 0; }
+.board-view { display: flex; flex: 1; flex-direction: column; gap: .8rem; min-height: 0; padding: .9rem 0 0; }
 .board-bar { align-items: center; display: flex; gap: .6rem; padding: 0 1rem; }
 .board-switch { align-items: center; background: transparent; border: 0; color: var(--foreground); cursor: pointer; display: flex; font-family: inherit; gap: .4rem; min-height: 2.4rem; min-width: 0; padding: 0; }
 .board-switch-name { font-size: 1.05rem; font-weight: 700; letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1187,17 +1205,28 @@ textarea { min-height: 6.5rem; resize: vertical; }
   padding: 0 1rem calc(var(--tab-bar-height) + env(safe-area-inset-bottom) + 1rem);
   /* Without this the snapport ignores the container's own padding and the
      first column parks flush against the screen edge. */
+  flex: 1;
+  min-height: 0;
   scroll-padding-inline: 1rem;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
 }
-.board-column { flex: 0 0 min(19rem, 82vw); scroll-snap-align: start; }
-.board-column-head { align-items: center; display: flex; gap: .45rem; margin-bottom: .55rem; }
+.board-column {
+  background: color-mix(in srgb, var(--card) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 1rem;
+  display: flex;
+  flex: 0 0 min(19rem, 82vw);
+  flex-direction: column;
+  padding: .75rem .7rem;
+  scroll-snap-align: start;
+}
+.board-column-head { align-items: center; display: flex; flex: 0 0 auto; gap: .45rem; margin-bottom: .6rem; padding: 0 .15rem; }
 .board-column-head h2 { font-size: .8rem; font-weight: 650; letter-spacing: .03em; margin: 0; text-transform: uppercase; }
 .board-column-count { background: var(--secondary); border-radius: 999px; color: var(--muted); font-size: .68rem; font-weight: 650; padding: .05rem .4rem; }
 .board-column-auto { border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--border)); border-radius: .4rem; color: var(--primary); font-size: .62rem; margin-left: auto; padding: .1rem .35rem; }
-.board-column-cards { display: flex; flex-direction: column; gap: .55rem; }
-.board-card { background: var(--card); border: 1px solid var(--border); border-radius: .8rem; color: inherit; cursor: pointer; display: flex; flex-direction: column; gap: .45rem; padding: .7rem .75rem; text-align: left; width: 100%; }
+.board-column-cards { display: flex; flex: 1; flex-direction: column; gap: .55rem; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: .2rem; }
+.board-card { background: var(--card); border: 1px solid var(--border); border-radius: .8rem; box-shadow: 0 1px 2px rgb(0 0 0 / .18); color: inherit; cursor: pointer; display: flex; flex-direction: column; gap: .45rem; padding: .7rem .75rem; text-align: left; width: 100%; }
 .board-card-head { align-items: center; display: flex; gap: .4rem; }
 .board-card-id, .board-card-age { color: var(--muted); font-size: .68rem; }
 .board-card-age { margin-left: auto; }
@@ -1230,3 +1259,9 @@ textarea { min-height: 6.5rem; resize: vertical; }
    quiet, and both keep the 44 px target. */
 .conversation-composer :global(.button-icon), .conversation-composer .button-icon { border-radius: 999px; }
 .conversation-composer button[type='submit'] { border-radius: 999px; }
+.relay-remove { color: var(--danger); }
+
+.workspace-scope { align-items: flex-end; display: flex; gap: .6rem; margin-bottom: 1rem; }
+.workspace-scope-field { display: flex; flex: 1; flex-direction: column; gap: .35rem; min-width: 0; }
+.workspace-scope-field label { color: var(--muted); font-size: .72rem; font-weight: 650; letter-spacing: .03em; text-transform: uppercase; }
+.workspace-scope :global(.workspace-create-button) { flex: 0 0 auto; white-space: nowrap; }

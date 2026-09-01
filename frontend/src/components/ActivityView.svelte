@@ -45,12 +45,25 @@
       deleting = false;
     }
   }
+
+  // Same day: the clock is enough. Older: the date, short.
+  function activityTime(value: number): string {
+    const stamp = new Date(value);
+    if (Number.isNaN(stamp.getTime())) return '';
+    const now = new Date();
+    const sameDay = stamp.getFullYear() === now.getFullYear()
+      && stamp.getMonth() === now.getMonth()
+      && stamp.getDate() === now.getDate();
+    return sameDay
+      ? stamp.toLocaleTimeString([], { timeStyle: 'short' })
+      : stamp.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+  }
 </script>
 
 <main class="page activity-page" aria-labelledby="activity-title">
   <div class="activity-detail-head activity-toolbar">
-    <h2 id="activity-title">Activity</h2>
-    <Button variant="danger" size="sm" disabled={!$activities.length || deleting} onclick={() => { confirmOpen = true; }}>Delete all</Button>
+    <h2 id="activity-title" class="sr-only">Activity</h2>
+    <Button variant="ghost" size="sm" class="activity-clear" disabled={!$activities.length || deleting} onclick={() => { confirmOpen = true; }}>Clear history</Button>
   </div>
   <section class="activity-summary" aria-labelledby="activity-summary-title">
     <header>
@@ -89,14 +102,14 @@
       <div class="empty-state">No matching activity.</div>
     {/if}
     {#each visible as activity (activity.activity_key)}
-      <button type="button" class="agent-card activity-item" onclick={() => open(activity)}>
+      <button type="button" class="activity-item" onclick={() => open(activity)}>
         <span class="activity-title">
           <span class={`status-dot status-${activityTone(activity.status)}`}></span>
           <strong class="agent-project">{activity.summary || activity.kind || 'Activity'}</strong>
-          <time datetime={new Date(Number(activity.timestamp)).toISOString()}>{new Date(Number(activity.timestamp)).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</time>
+          <time datetime={new Date(Number(activity.timestamp)).toISOString()}>{activityTime(Number(activity.timestamp))}</time>
           <span class="activity-chevron" aria-hidden="true">›</span>
         </span>
-        <span class="activity-meta">{[activity.relay_label, activity.project, activity.session, activity.agent, activity.status].filter(Boolean).join(' · ')}</span>
+        <span class="activity-meta">{[activity.project, activity.session].filter(Boolean).join(' · ')}</span>
       </button>
     {/each}
   </div>
@@ -111,7 +124,7 @@
 >
   <p class="hint">Running agents and their conversations are not affected.</p>
   <div class="dialog-actions">
-    <Button variant="danger" disabled={deleting} onclick={deleteAll}>{deleting ? 'Deleting…' : 'Delete all'}</Button>
+    <Button variant="danger" class="button-confirm" disabled={deleting} onclick={deleteAll}>{deleting ? 'Deleting…' : 'Delete all'}</Button>
     <Button variant="ghost" disabled={deleting} onclick={() => { confirmOpen = false; }}>Cancel</Button>
   </div>
 </AppDialog>

@@ -43,7 +43,11 @@ import { constants, gzipSync } from 'node:zlib';
 // board, card and compose views) add 9,881 B gzip. The release contract ships
 // one `assets/app.js`, so none of it can be split out of the bootstrap
 // payload, and the previous ceiling left 569 B of headroom.
-const limitKiB = 138;
+// Raised from 138 KiB for the design pass over Settings, Workspaces, Activity
+// and the board: hairline activity rows, segmented choice groups, bounded board
+// lanes, the outline treatment for destructive actions and the warm token set
+// add 1,821 B gzip, and the previous ceiling left 353 B.
+const limitKiB = 142;
 const limit = limitKiB * 1024;
 const root = resolve(process.argv[2] || 'dist');
 const files = ['index.html', 'assets/app.js', 'assets/app.css'];

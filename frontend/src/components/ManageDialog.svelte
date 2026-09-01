@@ -199,6 +199,7 @@
       <div class="dialog-actions">
         <Button
           variant={confirming === 'stop' ? 'danger' : 'secondary'}
+          class={confirming === 'stop' ? 'button-confirm' : ''}
           disabled={busy}
           onclick={confirming === 'stop' ? stopAgent : clearAgent}
         >{confirming === 'stop' ? 'Confirm Stop' : 'Confirm Clear'}</Button>

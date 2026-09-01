@@ -23,6 +23,16 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Settings, Workspaces, Activity and the board follow the same design system:
+  a screen is named once by its header rather than twice, a field label is a
+  label rather than a heading, a choice reads as one control instead of five
+  outlined frames, and the activity history is a hairline-separated list rather
+  than a stack of bordered cards.
+- Destructive actions are outlined rather than filled. A filled danger button
+  now only appears as the second step of a confirmation, where the button is
+  the decision.
+- Board columns are lanes with their own surface, bounded to the screen: each
+  lane scrolls its own cards instead of running under the tab bar.
 - Status colours now mean one thing each: the accent is *working*, green is
   *finished*, amber is *needs a look*, red is *blocked on you*. Every dot is
   paired with a word.
