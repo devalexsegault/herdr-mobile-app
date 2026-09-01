@@ -31,11 +31,15 @@ type Config struct {
 	WebRoot        string
 	HerdrBin       string
 	SocketPath     string
-	PollInterval   float64
-	RuntimeDir     string
-	LogFormat      string
-	ReleaseRoot    string
-	ServiceName    string
+	// BoardSocketPath is the herdr-board daemon socket the relay bridges to.
+	// Resolution mirrors boardd's own contract so the relay and the board CLI
+	// always agree on which daemon they are talking to.
+	BoardSocketPath string
+	PollInterval    float64
+	RuntimeDir      string
+	LogFormat       string
+	ReleaseRoot     string
+	ServiceName     string
 
 	// GatewayURL is the configured tie-break leader, kept equal to
 	// GatewayURLs[0] so readers that only know one gateway keep working. The
@@ -105,6 +109,11 @@ func Load() (*Config, error) {
 
 	if cfg.SocketPath == "" {
 		cfg.SocketPath = filepath.Join(cfg.ConfigHome, "herdr", "herdr.sock")
+	}
+
+	cfg.BoardSocketPath = os.Getenv("BOARD_SOCKET")
+	if cfg.BoardSocketPath == "" {
+		cfg.BoardSocketPath = filepath.Join(cfg.DataHome, "herdr-board", "boardd.sock")
 	}
 
 	cfg.RuntimeDir = resolveRuntimeDir(cfg.ConfigHome)

@@ -1,0 +1,10 @@
+{
+  "type": "board_rpc",
+  "request_id": "req-board-rpc",
+  "protocol": 2,
+  "method": "card.move",
+  "params": {
+    "card_id": 41,
+    "column_id": 9
+  }
+}

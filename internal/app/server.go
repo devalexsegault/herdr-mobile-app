@@ -23,6 +23,7 @@ import (
 	"github.com/0cv/herdr-mobile-relay/internal/agentroots"
 	"github.com/0cv/herdr-mobile-relay/internal/appdeploy"
 	"github.com/0cv/herdr-mobile-relay/internal/audit"
+	"github.com/0cv/herdr-mobile-relay/internal/board"
 	"github.com/0cv/herdr-mobile-relay/internal/clipboard"
 	"github.com/0cv/herdr-mobile-relay/internal/config"
 	"github.com/0cv/herdr-mobile-relay/internal/conversation"
@@ -93,6 +94,7 @@ type Server struct {
 	dispatcher       *coordinator.Dispatcher
 	updateM          *relayupdate.Manager
 	appDeployM       *appdeploy.Manager
+	boardM           *boardBridge
 	hybrid           *hybridTransport
 
 	mu        sync.RWMutex
@@ -143,7 +145,7 @@ func New(cfg *config.Config, version, revision string, logger *slog.Logger) *Ser
 	histManager := history.NewManager(cfg.CacheDir)
 	healthURL := fmt.Sprintf("http://127.0.0.1:%d/healthz", cfg.Port)
 
-	return &Server{
+	server := &Server{
 		cfg:                 cfg,
 		version:             version,
 		revision:            revision,
@@ -172,6 +174,8 @@ func New(cfg *config.Config, version, revision string, logger *slog.Logger) *Ser
 		historyLast:         make(map[string]time.Time),
 		historyActive:       make(map[string]bool),
 	}
+	server.boardM = newBoardBridge(board.New(cfg.BoardSocketPath, logger), hub, logger)
+	return server
 }
 
 func (s *Server) resolveAgentSessionName(agent *coordinator.AgentState) {
@@ -205,6 +209,7 @@ func (s *Server) Run(ctx context.Context) error {
 	s.transitionTasks = newLifecycleTasks(ctx)
 	s.historyTasks = newLifecycleTasks(ctx)
 	defer s.drainLifecycleWork()
+	defer s.boardM.close()
 	if err := s.state.EnableTriagePersistence(s.cfg.CacheDir); err != nil {
 		s.recordSafeError("durable agent triage unavailable", err)
 		s.logger.Warn("durable agent triage unavailable", "error", err)
@@ -272,6 +277,13 @@ func (s *Server) Run(ctx context.Context) error {
 		if s.hybrid.directEnabled() {
 			capabilities = append(capabilities, "webrtc_direct")
 		}
+		// The board plugin can be installed, stopped or removed without the
+		// relay restarting, so this is a live probe per connection rather than
+		// a startup decision.
+		boardDescriptor := s.boardM.descriptor(client.Context())
+		if boardDescriptor != nil {
+			capabilities = append(capabilities, protocol.BoardCapability)
+		}
 		s.hub.Send(client, protocol.PushConfig{
 			Type:           "push_config",
 			VAPIDPublicKey: vapidPublicKey,
@@ -284,6 +296,7 @@ func (s *Server) Run(ctx context.Context) error {
 			AppDeploy:      s.appDeployM.State(),
 			Capabilities:   capabilities,
 			Inventory:      inventory,
+			Board:          boardDescriptor,
 			AgentProfiles:  s.profiles.Profiles(),
 			Hybrid:         s.hybridDescriptor(),
 		})
@@ -313,6 +326,7 @@ func (s *Server) Run(ctx context.Context) error {
 
 	s.hub.SetOnDisconnect(func(client *transport.ClientConn) {
 		s.stopPaneWatch(client.ID(), "")
+		s.boardM.unsubscribe(client.ID())
 		if s.hybrid != nil {
 			s.hybrid.forgetClient(client.ID())
 		}
@@ -668,6 +682,19 @@ func (s *Server) Run(ctx context.Context) error {
 				s.recordSafeError("phone app origin was not stored", err)
 				s.logger.Warn("phone app origin was not stored", "error", err)
 			}
+		case "board_rpc":
+			// Board mutations are audited like any other remote write, but the
+			// reads are not: the app refetches the whole board on every coarse
+			// daemon event, and burying the writes under that traffic would
+			// make the audit log useless.
+			if board.Mutating(inbound.Method) {
+				s.recordWriteAudit(client, msg, nil)
+			}
+			s.boardM.handleRPC(commandCtx, client.ID(), inbound.RequestID, inbound.Method, inbound.Params)
+		case "board_subscribe":
+			s.boardM.subscribe(ctx, client.ID())
+		case "board_unsubscribe":
+			s.boardM.unsubscribe(client.ID())
 		case "refresh_agents":
 			inventory := s.committedInventoryStatus()
 			s.hub.Send(client, map[string]any{
@@ -2100,6 +2127,12 @@ func auditWriteDetails(message map[string]any) map[string]any {
 		return details
 	}
 	details := make(map[string]any)
+	// A board call's payload is the card prompt and comment text the phone
+	// typed, so only the method name is recorded in the clear; the params keep
+	// the digest-and-size treatment every other write gets.
+	if method, ok := message["method"].(string); ok && method != "" && auditAction(message) == "board_rpc" {
+		details["board_method"] = boundedAuditString(method, 80)
+	}
 	if encoded, err := json.Marshal(message); err == nil {
 		digest := sha256.Sum256(encoded)
 		details["payload_sha256"] = fmt.Sprintf("%x", digest[:])

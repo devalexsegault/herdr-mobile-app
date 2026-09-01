@@ -47,7 +47,12 @@ var mutatingTypes = map[string]bool{
 	"deploy_app_update":   true,
 	"install_update":      true,
 	"lease_pane_size":     true,
-	"release_pane_size":   true,
+	// board_rpc carries a boardd method inside its payload, and most of those
+	// methods mutate board state — moving a card into an auto column starts a
+	// real agent. Gating the envelope keeps that behind the protocol version
+	// check rather than trying to classify the inner method here.
+	"board_rpc":         true,
+	"release_pane_size": true,
 }
 
 type Inbound struct {
@@ -96,6 +101,12 @@ type Inbound struct {
 	ExpectedVersion   string          `json:"expected_version,omitempty"`
 	ExpectedRevision  string          `json:"expected_revision,omitempty"`
 	Subscription      json.RawMessage `json:"subscription,omitempty"`
+	// Method and Params carry a herdr-board protocol v1 call. They are opaque
+	// to the relay, which validates Method against its allowlist and forwards
+	// Params untouched, so the app can use boardd's documented contract
+	// directly instead of waiting for the relay to mirror each method.
+	Method string          `json:"method,omitempty"`
+	Params json.RawMessage `json:"params,omitempty"`
 }
 
 func DecodeMap(raw map[string]any) (Inbound, error) {
@@ -204,7 +215,12 @@ type PushConfig struct {
 	AppDeploy      any      `json:"app_deploy"`
 	Capabilities   []string `json:"capabilities"`
 	Inventory      any      `json:"inventory"`
-	AgentProfiles  any      `json:"agent_profiles"`
+	// Board describes the herdr-board daemon this relay can reach, and is
+	// omitted entirely when there is none. It travels with the capability so
+	// the app never has to make a second round trip to find out whether the
+	// board it is about to show can actually dispatch agents.
+	Board         map[string]any `json:"board,omitempty"`
+	AgentProfiles any            `json:"agent_profiles"`
 	// Hybrid advertises the gateway + direct WebRTC descriptor to an app that
 	// connected over the legacy WSS URL, so the bridge window needs no QR
 	// re-scan. Omitted entirely when the relay has no gateway configured.
@@ -212,6 +228,11 @@ type PushConfig struct {
 }
 
 const AgentResponseCopyCapability = "agent_response_copy"
+
+// BoardCapability tells the app this relay can reach a herdr-board daemon. It
+// is advertised per connection, from a live probe, because the board plugin can
+// be installed, removed or stopped without the relay restarting.
+const BoardCapability = "board_v1"
 
 var Capabilities = []string{
 	"attention_classification",
