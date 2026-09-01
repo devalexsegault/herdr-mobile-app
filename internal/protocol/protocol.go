@@ -219,8 +219,13 @@ type PushConfig struct {
 	// omitted entirely when there is none. It travels with the capability so
 	// the app never has to make a second round trip to find out whether the
 	// board it is about to show can actually dispatch agents.
-	Board         map[string]any `json:"board,omitempty"`
-	AgentProfiles any            `json:"agent_profiles"`
+	Board map[string]any `json:"board,omitempty"`
+	// Integrations reports each agent's Herdr state hook. An agent whose hook is
+	// missing never declares a session, so the relay cannot reconstruct its
+	// conversation: the app says that once, here, instead of leaving a dead
+	// control on every agent screen.
+	Integrations  any `json:"integrations,omitempty"`
+	AgentProfiles any `json:"agent_profiles"`
 	// Hybrid advertises the gateway + direct WebRTC descriptor to an app that
 	// connected over the legacy WSS URL, so the bridge window needs no QR
 	// re-scan. Omitted entirely when the relay has no gateway configured.

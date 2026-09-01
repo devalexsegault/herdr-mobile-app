@@ -41,6 +41,7 @@ import {
 } from './updates';
 import type {
   Activity,
+  AgentIntegration,
   Agent,
   AgentProfile,
   AgentInventoryStatus,
@@ -421,6 +422,7 @@ class RelayStore {
       lastMessageAt: 0,
       agentProfiles: [],
       capabilities: [],
+      integrations: [],
       directoryBrowser: null,
       directoryLoading: false,
       directoryError: '',
@@ -813,6 +815,11 @@ class RelayStore {
         ? message.board as BoardDescriptor
         : undefined;
       if (connection.board) this.sendRaw(relayId, { type: 'board_subscribe' });
+      connection.integrations = Array.isArray(message.integrations)
+        ? (message.integrations as AgentIntegration[]).filter(
+          (entry) => entry && typeof entry.agent === 'string' && entry.agent !== '',
+        )
+        : [];
       this.adoptHybridDescriptor(connection, message.hybrid);
       const attentionCapable = connection.capabilities.includes('attention_classification');
       this.agentsValue = this.agentsValue.map((agent) =>

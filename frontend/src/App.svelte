@@ -507,9 +507,9 @@
         <div class="mode-switch" role="group" aria-label="Agent view">
           <button
             class:active={$currentView.view === 'history'}
-            disabled={!conversationHistoryAvailable || !activeAgent}
+            disabled={!activeAgent}
             aria-pressed={$currentView.view === 'history'}
-            title={conversationHistoryAvailable ? 'Conversation' : 'Conversation is unavailable for this agent'}
+            title={conversationHistoryAvailable ? 'Conversation' : 'Why this agent has no conversation'}
             onclick={() => { if (activeAgent) replaceView({ view: 'history', paneId: activeAgent.pane_id }); }}
           >Chat</button>
           <button

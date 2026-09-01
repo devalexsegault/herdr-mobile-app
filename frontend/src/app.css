@@ -1265,3 +1265,5 @@ textarea { min-height: 6.5rem; resize: vertical; }
 .workspace-scope-field { display: flex; flex: 1; flex-direction: column; gap: .35rem; min-width: 0; }
 .workspace-scope-field label { color: var(--muted); font-size: .72rem; font-weight: 650; letter-spacing: .03em; text-transform: uppercase; }
 .workspace-scope :global(.workspace-create-button) { flex: 0 0 auto; white-space: nowrap; }
+.integration-hint { border-left: 3px solid var(--warning); margin-top: .6rem; padding-left: .6rem; }
+.integration-hint code { background: var(--secondary); border-radius: .3rem; font-size: .92em; padding: .05rem .3rem; }

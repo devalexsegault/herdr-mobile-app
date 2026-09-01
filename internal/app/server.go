@@ -95,7 +95,9 @@ type Server struct {
 	updateM          *relayupdate.Manager
 	appDeployM       *appdeploy.Manager
 	boardM           *boardBridge
-	hybrid           *hybridTransport
+	// Overridden in tests; production reads Herdr's own integration status.
+	herdrIntegrations func(context.Context) []herdrIntegration
+	hybrid            *hybridTransport
 
 	mu        sync.RWMutex
 	ready     bool
@@ -280,6 +282,7 @@ func (s *Server) Run(ctx context.Context) error {
 		// The board plugin can be installed, stopped or removed without the
 		// relay restarting, so this is a live probe per connection rather than
 		// a startup decision.
+		integrations := s.integrations(client.Context())
 		boardDescriptor := s.boardM.descriptor(client.Context())
 		if boardDescriptor != nil {
 			capabilities = append(capabilities, protocol.BoardCapability)
@@ -297,6 +300,7 @@ func (s *Server) Run(ctx context.Context) error {
 			Capabilities:   capabilities,
 			Inventory:      inventory,
 			Board:          boardDescriptor,
+			Integrations:   integrations,
 			AgentProfiles:  s.profiles.Profiles(),
 			Hybrid:         s.hybridDescriptor(),
 		})
@@ -460,7 +464,7 @@ func (s *Server) Run(ctx context.Context) error {
 				s.sendCommandResult(client, inbound.RequestID, action, false, "failed", "Agent changed while conversation history was loading", inbound.PaneID, nil)
 				break
 			}
-			s.sendCommandResult(client, inbound.RequestID, action, true, "completed", "", inbound.PaneID, page)
+			s.sendCommandResult(client, inbound.RequestID, action, true, "completed", "", inbound.PaneID, s.explainConversation(commandCtx, agent, page))
 		case "get_activity":
 			limit := messageInt(msg["limit"], 500)
 			if limit < 1 || limit > 500 {

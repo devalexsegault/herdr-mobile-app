@@ -21,6 +21,12 @@ project follows [Semantic Versioning](https://semver.org/).
   `board_v1` only when the daemon answers, so a computer without the plugin
   shows nothing to explain away.
 
+- The relay reports each agent's Herdr state hook at connect. When an agent runs
+  without one it can never declare a session, so no conversation exists for it;
+  Settings names that once, with the exact `herdr integration install` command,
+  instead of leaving a dead Chat control on every agent screen. Opening Chat on
+  such an agent now explains the situation rather than refusing to open.
+
 ### Changed
 
 - Settings, Workspaces, Activity and the board follow the same design system:

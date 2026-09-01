@@ -47,7 +47,7 @@ async function boot(page: Page, relays: RelayFixture[] = [], path = '/', options
     const commands: Record<string, unknown>[] = [];
     const socketCommands: Record<string, unknown>[][] = [];
     let nextInteraction: Record<string, unknown> | null = null;
-    let conversationFixture: { entries: unknown[]; total: number } | null = null;
+    let conversationFixture: { entries: unknown[]; total: number; reason?: string } | null = null;
     let boardFixture: Record<string, unknown> | null = null;
     let autoCommands = true;
 
@@ -197,13 +197,17 @@ async function boot(page: Page, relays: RelayFixture[] = [], path = '/', options
               request_id: message.request_id,
               ok: true,
               phase: 'completed',
-              data: {
-                available: true,
-                entries: older ? [] : fixture.entries,
-                has_more: false,
-                total: fixture.total,
-                file_truncated: false,
-              },
+              // A fixture with a reason answers the way the relay does when the
+              // agent never reported a session.
+              data: fixture.reason
+                ? { available: false, reason: fixture.reason, entries: [], has_more: false, total: 0 }
+                : {
+                  available: true,
+                  entries: older ? [] : fixture.entries,
+                  has_more: false,
+                  total: fixture.total,
+                  file_truncated: false,
+                },
             }));
             return;
           }
@@ -308,7 +312,7 @@ async function boot(page: Page, relays: RelayFixture[] = [], path = '/', options
       __relayServer(index: number, message: unknown) { sockets[index]?.server(message); },
       __relayClose(index: number) { sockets[index]?.serverClose(); },
       __relayNextInteraction(interaction: Record<string, unknown>) { nextInteraction = interaction; },
-      __relayConversationFixture(fixture: { entries: unknown[]; total: number } | null) {
+      __relayConversationFixture(fixture: { entries: unknown[]; total: number; reason?: string } | null) {
         conversationFixture = fixture;
       },
       __relayBoardFixture(fixture: Record<string, unknown> | null) { boardFixture = fixture; },
@@ -353,6 +357,8 @@ async function setAutoCommands(page: Page, enabled: boolean) {
 interface ConversationFixture {
   entries: Record<string, unknown>[];
   total: number;
+  /** Set to answer "no conversation, and here is why", as the relay does. */
+  reason?: string;
 }
 
 async function setConversationFixture(page: Page, fixture: ConversationFixture | null) {
@@ -5501,3 +5507,60 @@ test('hides the board tab when the relay has no board daemon', async ({ page }) 
   await expect(page.getByText('No board yet')).toBeVisible();
 });
 
+
+test('explains a missing conversation instead of leaving a dead control', async ({ page }) => {
+  await boot(page, [fedora]);
+  await expect.poll(() => socketCount(page)).toBe(1);
+  await handshake(page, 0, {
+    capabilities: ['attention_classification', 'conversation_history'],
+    integrations: [{ agent: 'claude', installed: false, state: 'not installed' }],
+  });
+  await setConversationFixture(page, {
+    entries: [],
+    total: 0,
+    reason: 'The Herdr integration for claude is not installed on that computer, so it never reports a session.',
+  });
+  await server(page, 0, {
+    type: 'agents',
+    agents: [{ pane_id: 'w1:p1', status: 'idle', project: 'Mobile app', agent: 'claude' }],
+  });
+
+  await page.getByRole('button', { name: 'Open Mobile app on Fedora' }).click();
+  // No transcript, so the agent opens on the terminal.
+  await expect(page.getByRole('log')).toBeVisible();
+
+  // Chat stays reachable: it is how the reader finds out why there is none.
+  const chat = page.locator('.mode-switch').getByRole('button', { name: 'Chat' });
+  await expect(chat).toBeEnabled();
+  await chat.click();
+
+  await expect(page.getByText('The Herdr integration for claude is not installed')).toBeVisible();
+});
+
+test('names the missing agent integration once, in settings', async ({ page }) => {
+  await boot(page, [fedora]);
+  await expect.poll(() => socketCount(page)).toBe(1);
+  await handshake(page, 0, {
+    integrations: [
+      { agent: 'claude', installed: true, state: 'current (v8)' },
+      { agent: 'codex', installed: false, state: 'not installed' },
+      // Not running here, so naming it would be noise.
+      { agent: 'pi', installed: false, state: 'not installed' },
+    ],
+  });
+  await server(page, 0, {
+    type: 'agents',
+    agents: [
+      { pane_id: 'w1:p1', status: 'idle', project: 'Mobile app', agent: 'claude' },
+      { pane_id: 'w1:p2', status: 'idle', project: 'Mobile app', agent: 'codex' },
+    ],
+  });
+
+  await page.getByRole('button', { name: /Settings/ }).click();
+
+  const hint = page.locator('.integration-hint');
+  await expect(hint).toHaveCount(1);
+  await expect(hint).toContainText('herdr integration install codex');
+  await expect(hint).not.toContainText('pi');
+  await expect(hint).not.toContainText('claude');
+});

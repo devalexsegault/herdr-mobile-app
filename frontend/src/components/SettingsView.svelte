@@ -84,6 +84,26 @@
   const relays = relayStore.relayConfigs;
   const connections = relayStore.connections;
   const agents = relayStore.agents;
+
+  // Only the agents actually running on that computer are worth naming: Herdr
+  // ships hooks for a dozen harnesses, and listing the ones nobody runs would
+  // turn a real problem into noise.
+  const missingIntegrations = $derived.by(() => {
+    const rows: { relayId: string; label: string; agents: string[] }[] = [];
+    for (const connection of $connections.values()) {
+      if (connection.status !== 'connected' || !connection.integrations.length) continue;
+      const running = new Set($agents
+        .filter((agent) => agent.relay_id === connection.relay.id)
+        .map((agent) => String(agent.agent || '').trim().toLowerCase())
+        .filter(Boolean));
+      const missing = connection.integrations
+        .filter((integration) => !integration.installed && running.has(integration.agent))
+        .map((integration) => integration.agent)
+        .sort();
+      if (missing.length) rows.push({ relayId: connection.relay.id, label: connection.relay.label, agents: missing });
+    }
+    return rows;
+  });
   const notificationBusy = relayStore.notificationBusy;
   const appUpdate = appUpdateStatus;
   let previousAppUpdate = $state<AppUpdateStatus | null>(null);
@@ -532,6 +552,13 @@
         </article>
       {/each}
     </div>
+    {#each missingIntegrations as entry (entry.relayId)}
+      <p class="hint integration-hint" role="status">
+        <strong>{entry.label}:</strong>
+        conversation history needs the Herdr agent integration for {entry.agents.join(', ')}.
+        Run <code>herdr integration install {entry.agents[0]}</code> on that computer, then restart the agent.
+      </p>
+    {/each}
     <p class="hint">Use one relay URL per computer. Relay keys stay in this browser’s local storage and encrypt relay messages end to end.</p>
   </Card>
 

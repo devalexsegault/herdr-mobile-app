@@ -61,6 +61,18 @@ the same pane, and the raw terminal keeps everything it always had. Approvals
 and structured questions are answered in the conversation itself, directly
 above the composer.
 
+### When an agent has no conversation
+
+A conversation exists only when the agent declares its session to Herdr, which
+it does through the state hook `herdr integration install <agent>` writes into
+that agent's own configuration. Without the hook Herdr reports no session, the
+relay cannot locate a transcript, and the agent opens on the terminal.
+
+The relay reports the hook status of every agent at connect, so Settings names
+the missing ones — only the agents actually running on that computer — with the
+command to fix it. Agents started before the hook was installed keep no
+transcript; restart them to record one.
+
 ## The board
 
 When the relay reports a running [herdr-board](https://github.com/nelsonPires5/herdr-board)

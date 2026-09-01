@@ -265,12 +265,25 @@ export interface ConversationPage {
   fileTruncated: boolean;
 }
 
+/** One agent's Herdr state hook, as the relay reports it at connect. */
+export interface AgentIntegration {
+  agent: string;
+  installed: boolean;
+  state: string;
+}
+
 export interface RelayConnectionView {
   /**
    * The herdr-board daemon this relay can reach, when it advertises `board_v1`.
    * Absent means no board: the Board tab has nothing to show for this relay.
    */
   board?: BoardDescriptor;
+  /**
+   * Agent state hooks on that computer. An agent whose hook is missing never
+   * declares a session, so its conversation can never be read -- something to
+   * say once, in Settings, rather than on every agent screen.
+   */
+  integrations: AgentIntegration[];
   relay: RelayConfig;
   status: RelayStatus;
   /**
