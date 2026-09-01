@@ -665,7 +665,7 @@
   {#if workingWorkspaces.length}
     <section class="agent-section working-section" aria-labelledby="section-working">
       <h2 id="section-working" class="section-heading">
-        <span class="status-dot status-warning"></span>Working
+        <span class="status-dot status-primary"></span>Working
         <span class="section-count" aria-hidden="true">{workingAgents.length}</span>
       </h2>
       {@render workspaceGrid(workingWorkspaces, true, 'working')}

@@ -39,9 +39,47 @@ setup and want to know what every screen and control is for.
 | --- | --- |
 | <img src="../images/git-history.jpeg" alt="Read-only mobile Git diff with diff-aware colors and zoom controls" width="392"> | <img src="../images/conversations.jpeg" alt="Mobile native conversation history rendered from the agent transcript" width="392"> |
 
+## Getting around
+
+The app has three sections, on a bottom tab bar:
+
+- **Today** — what needs you first, across every project on the relay, then
+  what is running, grouped by project. The `+` button starts an agent, the
+  gear opens Settings, and **All agents and workspaces** at the bottom opens
+  the workspace-grouped list with tab reordering and worktrees.
+- **Board** — the herdr-board kanban for this computer, when the relay has the
+  plugin (see below).
+- **Activity** — the rolling activity history.
+
+Everything else is a screen pushed over the section it was opened from: an
+agent, a card, Settings, the launch form. Those screens hide the tab bar and
+show a back arrow, so the phone never has two navigation systems at once.
+
+An agent opens as a **conversation** whenever the relay can reconstruct one for
+that harness; `Chat`/`Terminal` in the header switches between the two views of
+the same pane, and the raw terminal keeps everything it always had. Approvals
+and structured questions are answered in the conversation itself, directly
+above the composer.
+
+## The board
+
+When the relay reports a running [herdr-board](https://github.com/nelsonPires5/herdr-board)
+daemon it advertises the `board_v1` capability, and the Board tab appears. The
+relay bridges the board's socket protocol; it never exposes the whole protocol,
+only an allowlist that excludes `daemon.stop` and every pane call, and it
+audits the mutations like any other remote write.
+
+The board is per computer: a board belongs to the machine whose daemon owns it,
+and boards from different relays are never merged. Columns scroll horizontally,
+one full column at a time. A column whose trigger is `auto` is labelled *starts
+an agent*, because moving a card into it dispatches one for real. A card opens
+with its run controls (cancel, retry, mark done), its move targets, its
+instruction and its comments; a card with an open run cannot be moved until the
+run ends. Cards, comments and whole projects can be created from the phone.
+
 ## Workspace navigation and inspection
 
-The home screen keeps agents that need input visible at the top. By default,
+The All agents screen keeps agents that need input visible at the top. By default,
 each workspace below them appears once — mixed — with a dot for its most
 notable session: done, then working, then idle. The **Home Workspaces**
 setting can separate them into Done, Working, and Idle sections instead; both

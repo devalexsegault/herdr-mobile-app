@@ -3,6 +3,32 @@
 Notable user-facing changes to Herdr Mobile Relay are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- A three-section bottom tab bar — Today, Board, Activity. Today leads with
+  what needs an answer across every project, then what is running, grouped by
+  project; the workspace-grouped list keeps its tab reordering and worktrees
+  under **All agents and workspaces**.
+- Agents open as a conversation whenever the relay can reconstruct one, with a
+  `Chat`/`Terminal` switch in the header. Approvals and structured questions
+  are answered in the conversation itself instead of sending you to the raw
+  terminal.
+- A Board section backed by a local [herdr-board](https://github.com/nelsonPires5/herdr-board)
+  daemon: read the kanban, move cards, cancel, retry or close a run, comment,
+  and create cards, boards and projects from the phone. The relay advertises
+  `board_v1` only when the daemon answers, so a computer without the plugin
+  shows nothing to explain away.
+
+### Changed
+
+- Status colours now mean one thing each: the accent is *working*, green is
+  *finished*, amber is *needs a look*, red is *blocked on you*. Every dot is
+  paired with a word.
+- An agent screen carries one primary action. Find in Terminal and Inspect
+  Workspace moved into the agent's `•••` menu.
+
 ## [0.19.1] - 2026-08-29
 
 ### Fixed

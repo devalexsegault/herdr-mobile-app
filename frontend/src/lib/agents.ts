@@ -40,10 +40,16 @@ export function agentStatusGroup(agent: Partial<Agent> | null | undefined): 'att
   return 'other';
 }
 
-export function agentStatusTone(agent: Partial<Agent> | null | undefined): 'danger' | 'warning' | 'success' | 'muted' {
+// One colour, one meaning. An agent that is running and an agent that has
+// finished are two different things to a person scanning the list, so working
+// took the accent and green was freed for "done, go and read it". Amber is left
+// to the one state that is neither: something needs a look but nothing is
+// blocked on an answer.
+export function agentStatusTone(agent: Partial<Agent> | null | undefined): 'danger' | 'warning' | 'primary' | 'success' | 'muted' {
   const group = agentStatusGroup(agent);
   if (group === 'blocked') return 'danger';
-  if (group === 'attention' || group === 'working') return 'warning';
+  if (group === 'attention') return 'warning';
+  if (group === 'working') return 'primary';
   if (group === 'done') return 'success';
   return 'muted';
 }

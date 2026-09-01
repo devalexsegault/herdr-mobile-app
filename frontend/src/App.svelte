@@ -4,6 +4,10 @@
   import ActivityDetail from '$components/ActivityDetail.svelte';
   import ActivityView from '$components/ActivityView.svelte';
   import AgentList from '$components/AgentList.svelte';
+  import BoardView from '$components/BoardView.svelte';
+  import CardView from '$components/CardView.svelte';
+  import HomeView from '$components/HomeView.svelte';
+  import TabBar from '$components/TabBar.svelte';
   import AgentRail from '$components/AgentRail.svelte';
   import ConversationHistory from '$components/ConversationHistory.svelte';
   import LaunchView from '$components/LaunchView.svelte';
@@ -43,7 +47,9 @@
     navigate,
     replaceView,
     routeNotificationUrl,
+    tabForView,
     viewUrl,
+    type ViewState,
   } from '$lib/router';
   import { initializeDeviceSecurity, securityState } from '$lib/security';
   import { relayStore } from '$lib/store';
@@ -121,15 +127,25 @@
       : relayUpdateNeedsAttention
         ? 'Settings, relay update needs attention'
         : 'Settings');
+  // Root views keep the tab bar; a pushed view (terminal, card, settings) owns
+  // the whole screen.
+  const activeTab = $derived(tabForView($currentView));
+  const agentView = $derived($currentView.view === 'terminal' || $currentView.view === 'history');
+  const waitingCount = $derived($agents.filter(
+    (agent) => agentNeedsResponse(agent) || agentNeedsInspection(agent),
+  ).length);
   const headerTitle = $derived.by(() => {
     if ($currentView.view === 'settings') return 'Settings';
     if ($currentView.view === 'workspaces') return 'Workspaces';
+    if ($currentView.view === 'agents_all') return 'All agents';
     if ($currentView.view === 'launch') return 'Start Agent';
     if ($currentView.view === 'activity') return 'Activity';
     if ($currentView.view === 'activity_detail') return 'Activity';
+    if ($currentView.view === 'board') return 'Board';
+    if ($currentView.view === 'board_card') return 'Card';
     if (activeAgent) return activeAgent.project || displayName(activeAgent);
     if ($currentView.view === 'terminal') return 'Terminal';
-    return '🐑 herdr';
+    return 'Today';
   });
   const headerMeta = $derived(activeAgent ? terminalSecondaryLabel(activeAgent) : '');
   const headerIndicator = $derived.by(() => {
@@ -206,7 +222,7 @@
     if (target.action) {
       if (!agent || !agent.event_id) return;
       clearNotificationFallback();
-      replaceView({ view: 'terminal', paneId: agent.pane_id });
+      replaceView(agentTarget(agent));
       void executeNotificationAction(agent, target);
       return;
     }
@@ -226,11 +242,11 @@
     if (notificationFallback && notificationFallbackKey !== key) clearNotificationFallback();
     if (!notificationFallback) {
       notificationFallbackKey = key;
-      const paneId = agent.pane_id;
+      const target = agentTarget(agent);
       notificationFallback = setTimeout(() => {
         notificationFallback = null;
         notificationFallbackKey = '';
-        if (get(currentView).view === 'notification') replaceView({ view: 'terminal', paneId });
+        if (get(currentView).view === 'notification') replaceView(target);
       }, 1500);
     }
   });
@@ -305,9 +321,21 @@
     };
   });
 
+  // An agent opens as a conversation whenever the relay can reconstruct one.
+  // The terminal is still one tap away, but it is no longer the first thing a
+  // phone shows for work that reads as a chat.
+  function agentTarget(agent: Agent): ViewState {
+    const connection = $connections.get(agent.relay_id);
+    const chat = Boolean(
+      agent.conversation_history_available
+      && connection?.capabilities.includes('conversation_history'),
+    );
+    return chat ? { view: 'history', paneId: agent.pane_id } : { view: 'terminal', paneId: agent.pane_id };
+  }
+
   function openAgent(agent: Agent) {
     void relayStore.acknowledgePane(agent);
-    navigate({ view: 'terminal', paneId: agent.pane_id });
+    navigate(agentTarget(agent));
   }
 
   function toggle(view: 'settings' | 'launch' | 'activity' | 'workspaces') {
@@ -447,9 +475,9 @@
   }
 </script>
 
-<div class="app-shell">
-  <header class="app-header" class:home-header={$currentView.view === 'agents'}>
-    {#if $currentView.view !== 'agents'}
+<div class="app-shell" class:tabbed={activeTab !== null}>
+  <header class="app-header" class:home-header={activeTab !== null}>
+    {#if !activeTab}
       <Button variant="ghost" size="icon" aria-label="Back" onclick={closeCurrentView}>
         <svg class="back-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
           <path d="m15 18-6-6 6-6"></path>
@@ -468,88 +496,52 @@
     </div>
     {#if $currentView.view === 'agents'}<span class="agent-count">{connected}/{$relays.length} relays{#if $agents.length} · {$agents.length}{/if}</span>{/if}
     <nav aria-label="Application">
-      <Button class="global-jump-button" variant="ghost" size="icon" aria-label="Search all agents" title="Search all agents" onclick={() => { jumpOpen = true; }}>
-        <svg class="header-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
-          <circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path>
-        </svg>
-      </Button>
-      {#if $currentView.view === 'terminal'}
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Find in terminal"
-          title="Find in terminal"
-          disabled={!activeAgent}
-          onclick={() => terminalView?.openFind()}
-        >
+      {#if agentView}
+        <div class="mode-switch" role="group" aria-label="Agent view">
+          <button
+            class:active={$currentView.view === 'history'}
+            disabled={!conversationHistoryAvailable || !activeAgent}
+            aria-pressed={$currentView.view === 'history'}
+            title={conversationHistoryAvailable ? 'Conversation' : 'Conversation is unavailable for this agent'}
+            onclick={() => { if (activeAgent) replaceView({ view: 'history', paneId: activeAgent.pane_id }); }}
+          >Chat</button>
+          <button
+            class:active={$currentView.view === 'terminal'}
+            disabled={!activeAgent}
+            aria-pressed={$currentView.view === 'terminal'}
+            title="Terminal"
+            onclick={() => { if (activeAgent) replaceView({ view: 'terminal', paneId: activeAgent.pane_id }); }}
+          >Terminal</button>
+        </div>
+        <Button variant="ghost" size="icon" aria-label="Manage agent" disabled={!activeAgent} onclick={() => { manageOpen = true; }}>•••</Button>
+      {:else if activeTab || $currentView.view === 'agents_all'}
+        {#if activeTab}
+        <Button class="global-jump-button" variant="ghost" size="icon" aria-label="Search all agents" title="Search all agents" onclick={() => { jumpOpen = true; }}>
           <svg class="header-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
             <circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path>
           </svg>
         </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Conversation history"
-          disabled={!conversationHistoryAvailable || !activeAgent}
-          title={conversationHistoryAvailable ? 'Conversation history' : 'Conversation history is unavailable for this agent'}
-          onclick={() => { if (activeAgent) replaceView({ view: 'history', paneId: activeAgent.pane_id }); }}
-        >
-          <svg class="header-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-            <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"></path>
-            <path d="M4 5.5v15M8 7h8M8 11h6"></path>
-          </svg>
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Inspect workspace"
-          disabled={!workspaceInspectionAvailable}
-          title={workspaceInspectionAvailable ? 'Inspect workspace files and Git changes' : 'Workspace inspection is unavailable'}
-          onclick={() => { workspaceOpen = true; }}
-        >
-          <svg class="header-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-            <path d="M3 5.5h7l2 2h9v11H3z"></path>
-          </svg>
-        </Button>
-        <Button variant="ghost" size="icon" aria-label="Manage agent" disabled={!activeAgent} onclick={() => { manageOpen = true; }}>•••</Button>
-      {:else if $currentView.view === 'history'}
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Terminal view"
-          title="Terminal view"
-          disabled={!activeAgent}
-          onclick={() => { if (activeAgent) replaceView({ view: 'terminal', paneId: activeAgent.pane_id }); }}
-        >
-          <svg class="header-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-            <rect x="3" y="4" width="18" height="16" rx="2"></rect>
-            <path d="m7 9 3 3-3 3M12 15h5"></path>
-          </svg>
-        </Button>
-      {:else}
-        <Button variant="ghost" size="icon" aria-label="Manage workspaces" title="Manage workspaces" onclick={() => toggle('workspaces')}>
-          <svg class="header-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-            <path d="M3 5.5h7l2 2h9v11H3z"></path>
-            <path d="M8 13h8M12 9v8"></path>
-          </svg>
-        </Button>
-        <Button variant="ghost" size="icon" aria-label="Start agent" onclick={() => toggle('launch')}>＋</Button>
-        <Button variant="ghost" size="icon" aria-label="Activity history" onclick={() => toggle('activity')}>
-          <svg class="header-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-            <circle cx="12" cy="12" r="9"></circle>
-            <path d="M12 7v5l3 2"></path>
-          </svg>
-        </Button>
+        {/if}
+        {#if $currentView.view === 'agents' || $currentView.view === 'agents_all'}
+          <Button variant="ghost" size="icon" aria-label="Manage workspaces" title="Manage workspaces" onclick={() => toggle('workspaces')}>
+            <svg class="header-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="M3 5.5h7l2 2h9v11H3z"></path>
+              <path d="M8 13h8M12 9v8"></path>
+            </svg>
+          </Button>
+        {/if}
+        {#if activeTab || $currentView.view === 'agents_all'}
+          <span class="nav-button-shell">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={settingsLabel}
+              onclick={() => toggle('settings')}
+            >⚙</Button>
+            {#if updateAvailable}<span class="nav-update-badge" aria-hidden="true"></span>{/if}
+          </span>
+        {/if}
       {/if}
-      <span class="nav-button-shell">
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={settingsLabel}
-          onclick={() => toggle('settings')}
-        >⚙</Button>
-        {#if updateAvailable}<span class="nav-update-badge" aria-hidden="true"></span>{/if}
-      </span>
     </nav>
   </header>
 
@@ -600,13 +592,44 @@
         <p role="status">Opening agent…</p>
       {/if}
     </main>
-  {:else}
+  {:else if $currentView.view === 'agents_all'}
     <AgentList bind:workspaceDisclosure agents={$agents} workspaces={$workspaces} relays={$relays} connections={$connections} responding={$responding} onopen={openAgent} />
+  {:else if $currentView.view === 'board'}
+    <BoardView />
+  {:else if $currentView.view === 'board_card'}
+    {#key $currentView.cardId}
+      <CardView cardId={$currentView.cardId} />
+    {/key}
+  {:else}
+    <HomeView
+      agents={$agents}
+      relays={$relays}
+      connections={$connections}
+      responding={$responding}
+      onopen={openAgent}
+      onbrowse={() => navigate({ view: 'agents_all' })}
+    />
+  {/if}
+
+  {#if activeTab}
+    {#if activeTab === 'today'}
+      <button class="home-fab" aria-label="Start agent" onclick={() => navigate({ view: 'launch' })}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M12 5v14M5 12h14"></path>
+        </svg>
+      </button>
+    {/if}
+    <TabBar attention={waitingCount} />
   {/if}
 </div>
 
 <UpdateProgressDialog />
-<ManageDialog bind:open={manageOpen} agent={activeAgent} />
+<ManageDialog
+  bind:open={manageOpen}
+  agent={activeAgent}
+  onfind={$currentView.view === 'terminal' ? () => terminalView?.openFind() : undefined}
+  oninspect={workspaceInspectionAvailable ? () => { workspaceOpen = true; } : undefined}
+/>
 <GlobalJump bind:open={jumpOpen} agents={$agents} onselect={openAgent} />
 <WorkspaceInspector bind:open={workspaceOpen} agent={activeAgent} />
 <LockScreen />

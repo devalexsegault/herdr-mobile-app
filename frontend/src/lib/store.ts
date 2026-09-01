@@ -23,6 +23,7 @@ import {
   staleAgentRevision,
   stabilizeBlockedSnapshot,
 } from './agents';
+import type { BoardDescriptor, BoardErrorPayload } from './board/types';
 import { relayProtocolError } from './protocol';
 import { createRelayTransport } from './transports';
 import type {
@@ -222,6 +223,12 @@ interface PendingRequest extends PendingOperation {
   resolve: (result: CommandResult) => void;
 }
 
+interface PendingBoardRequest {
+  resolve: (value: unknown) => void;
+  reject: (error: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
+
 interface PendingUpload extends PendingOperation {
   filename: string;
   resolve: (path: string) => void;
@@ -265,6 +272,12 @@ class RelayStore {
   readonly responding = writable<Set<string>>(new Set());
   readonly toast = writable<ToastMessage | null>(null);
   readonly notificationBusy = writable(false);
+  /**
+   * Bumped whenever a relay's board daemon reports a change (or a gap in the
+   * event stream). Views watch it and refetch; nothing is patched from an event
+   * payload, because boardd documents those as coarse hints, not state.
+   */
+  readonly boardRevision = writable<Map<string, number>>(new Map());
 
   private connectionsValue = new Map<string, RelayConnection>();
   private agentsValue: Agent[] = [];
@@ -275,6 +288,7 @@ class RelayStore {
   private blockedSnapshotMisses = new Map<string, number>();
   private pendingRequests = new Map<string, PendingRequest>();
   private pendingUploads = new Map<string, PendingUpload>();
+  private pendingBoardRequests = new Map<string, PendingBoardRequest>();
   private pendingPaneReads = new Map<string, number>();
   private paneContentFingerprints = new Map<string, string>();
   private watchedPanes = new Map<string, Agent>();
@@ -793,6 +807,12 @@ class RelayStore {
       connection.appDeploy = normalizeAppDeployment(message.app_deploy);
       connection.inventory = normalizeAgentInventory(message.inventory, 'ready');
       connection.capabilities = Array.isArray(message.capabilities) ? message.capabilities.filter(Boolean) : [];
+      // The relay probes its board daemon on every connect, so the descriptor
+      // arrives (or does not) with the handshake and never needs a round trip.
+      connection.board = connection.capabilities.includes('board_v1') && message.board
+        ? message.board as BoardDescriptor
+        : undefined;
+      if (connection.board) this.sendRaw(relayId, { type: 'board_subscribe' });
       this.adoptHybridDescriptor(connection, message.hybrid);
       const attentionCapable = connection.capabilities.includes('attention_classification');
       this.agentsValue = this.agentsValue.map((agent) =>
@@ -860,6 +880,18 @@ class RelayStore {
       this.handleCommandResult(relayId, message as CommandResult);
       return;
     }
+    if (message.type === 'board_result') {
+      this.handleBoardResult(message);
+      return;
+    }
+    // boardd's events are coarse by contract: the payload is for logs, and the
+    // client refetches. A resync says the stream had a gap, which needs exactly
+    // the same response, so both land on one revision bump.
+    if (message.type === 'board_event' || message.type === 'board_resync') {
+      this.bumpBoardRevision(relayId);
+      return;
+    }
+    if (message.type === 'board_subscribed') return;
     if (message.type === 'upload_result') {
       this.handleUploadResult(relayId, message);
       return;
@@ -1172,6 +1204,65 @@ class RelayStore {
         this.pendingRequests.delete(requestId);
         reject(new CommandError('Could not send command to relay'));
       }
+    });
+  }
+
+  /**
+   * Calls one herdr-board method through the relay's bridge. The relay owns the
+   * allowlist, so a refusal comes back as a board error with code 1 rather than
+   * as a transport failure; code 0 means the daemon never answered.
+   */
+  boardRpc<T = unknown>(relayId: string, method: string, params?: Record<string, unknown>): Promise<T> {
+    const connection = this.connectionsValue.get(relayId);
+    if (!connection || connection.status !== 'connected') {
+      return Promise.reject(new CommandError('Relay is not connected'));
+    }
+    if (!connection.board) return Promise.reject(new CommandError('This relay has no board'));
+    const requestId = commandRequestId();
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingBoardRequests.delete(requestId);
+        reject(new CommandError('The board did not answer'));
+      }, COMMAND_TIMEOUT_MS);
+      this.pendingBoardRequests.set(requestId, {
+        resolve: resolve as (value: unknown) => void,
+        reject,
+        timer,
+      });
+      const sent = this.sendRaw(relayId, {
+        type: 'board_rpc',
+        request_id: requestId,
+        protocol: APP_PROTOCOL_VERSION,
+        method,
+        params: params || {},
+      });
+      if (!sent) {
+        clearTimeout(timer);
+        this.pendingBoardRequests.delete(requestId);
+        reject(new CommandError('Could not reach the board'));
+      }
+    });
+  }
+
+  private handleBoardResult(message: Record<string, any>): void {
+    const requestId = String(message.request_id || '');
+    const pending = this.pendingBoardRequests.get(requestId);
+    if (!pending) return;
+    this.pendingBoardRequests.delete(requestId);
+    clearTimeout(pending.timer);
+    if (message.ok) {
+      pending.resolve(message.result);
+      return;
+    }
+    const error = (message.error || {}) as BoardErrorPayload;
+    pending.reject(new CommandError(error.message || 'The board refused this request'));
+  }
+
+  private bumpBoardRevision(relayId: string): void {
+    this.boardRevision.update((current) => {
+      const next = new Map(current);
+      next.set(relayId, (next.get(relayId) || 0) + 1);
+      return next;
     });
   }
 

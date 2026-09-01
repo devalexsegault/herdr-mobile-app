@@ -7,7 +7,19 @@
   import { relayStore } from '$lib/store';
   import type { Agent } from '$lib/types';
 
-  let { open = $bindable(false), agent }: { open?: boolean; agent: Agent | null } = $props();
+  let {
+    open = $bindable(false),
+    agent,
+    onfind,
+    oninspect,
+  }: {
+    open?: boolean;
+    agent: Agent | null;
+    // Find and Inspect used to be permanent header icons. They moved here so an
+    // agent screen carries one primary action instead of four competing ones.
+    onfind?: () => void;
+    oninspect?: () => void;
+  } = $props();
   let name = $state('');
   let renameMode = $state<'tab' | 'session' | ''>('');
   let confirming = $state<'clear' | 'stop' | ''>('');
@@ -196,6 +208,12 @@
   {:else}
     <div bind:this={actionMenu} class="form-stack">
       <div class="dialog-actions">
+        {#if onfind}
+          <Button data-agent-action="find" variant="secondary" disabled={busy} onclick={() => { open = false; onfind(); }}>Find in Terminal</Button>
+        {/if}
+        {#if oninspect}
+          <Button data-agent-action="inspect" variant="secondary" disabled={busy} onclick={() => { open = false; oninspect(); }}>Inspect Workspace</Button>
+        {/if}
         <Button data-rename-action="tab" disabled={busy} onclick={() => beginRename('tab')}>Rename Tab</Button>
         {#if sessionRenameAvailable}
           <Button data-rename-action="session" variant="secondary" disabled={busy} onclick={() => beginRename('session')}>Rename Session</Button>

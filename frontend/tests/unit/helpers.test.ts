@@ -477,7 +477,8 @@ describe('terminal rendering', () => {
 
 describe('agent state and sorting', () => {
   it('maps active agent states to semantic indicator tones', () => {
-    expect(agentStatusTone(agent({ status: 'working' }))).toBe('warning');
+    // Working owns the accent and done owns green: one colour, one meaning.
+    expect(agentStatusTone(agent({ status: 'working' }))).toBe('primary');
     expect(agentStatusTone(agent({
       status: 'blocked', attention_kind: 'approval', attention_capable: true,
     }))).toBe('danger');

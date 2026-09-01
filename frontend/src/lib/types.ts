@@ -1,3 +1,4 @@
+import type { BoardDescriptor } from '$lib/board/types';
 import type { TransportKind } from './transports/types';
 
 export type RelayStatus = 'connecting' | 'connected' | 'disconnected';
@@ -265,6 +266,11 @@ export interface ConversationPage {
 }
 
 export interface RelayConnectionView {
+  /**
+   * The herdr-board daemon this relay can reach, when it advertises `board_v1`.
+   * Absent means no board: the Board tab has nothing to show for this relay.
+   */
+  board?: BoardDescriptor;
   relay: RelayConfig;
   status: RelayStatus;
   /**

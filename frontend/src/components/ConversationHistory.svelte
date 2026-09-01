@@ -1,14 +1,25 @@
 <script lang="ts">
   import { onMount, tick, untrack } from 'svelte';
   import ConversationMessage from '$components/ConversationMessage.svelte';
+  import QuestionForm from '$components/QuestionForm.svelte';
   import Button from '$components/ui/Button.svelte';
-  import { agentNeedsInspection, agentNeedsResponse, displayName } from '$lib/agents';
+  import {
+    agentNeedsInspection,
+    agentNeedsResponse,
+    approvalButtonTone,
+    approvalOptions,
+    approvalPromptPreview,
+    displayName,
+    questionInteraction,
+  } from '$lib/agents';
   import { conversationEntries } from '$lib/conversation';
   import { clearPromptDraft, loadPromptDraft, savePromptDraft } from '$lib/prompt-drafts';
   import { relayStore } from '$lib/store';
   import type { Agent, ConversationEntry } from '$lib/types';
 
   let { agent }: { agent: Agent } = $props();
+
+  const responding = relayStore.responding;
 
   let entries = $state<ConversationEntry[]>([]);
   let available = $state(true);
@@ -40,11 +51,18 @@
 
   const modeEntries = $derived(mode === 'conversation' ? conversationEntries(entries) : entries);
   const inputLocked = $derived(agentNeedsResponse(agent) || agentNeedsInspection(agent));
-  const inputPlaceholder = $derived(agentNeedsResponse(agent)
-    ? 'Needs response — switch to Terminal'
-    : agentNeedsInspection(agent)
-      ? 'Needs inspection — switch to Terminal'
-      : 'Type a reply…');
+  // An approval or a question is answered here, in the thread, rather than by
+  // sending the person off to the raw terminal to find the prompt themselves.
+  const interaction = $derived(questionInteraction(agent));
+  const options = $derived(approvalOptions(agent));
+  const answerable = $derived(agentNeedsResponse(agent) && Boolean(interaction || options.length));
+  const inputPlaceholder = $derived(answerable
+    ? 'Answer above to continue'
+    : agentNeedsResponse(agent)
+      ? 'Needs response — switch to Terminal'
+      : agentNeedsInspection(agent)
+        ? 'Needs inspection — switch to Terminal'
+        : 'Type a reply…');
   const visibleEntries = $derived.by(() => {
     const needle = query.trim().toLocaleLowerCase();
     if (!needle) return modeEntries;
@@ -373,6 +391,27 @@
   {/if}
 
   <div class="conversation-input-area">
+    {#if answerable}
+      <div class="conversation-answer" aria-label={`Pending request from ${displayName(agent)}`}>
+        {#if interaction}
+          <QuestionForm {agent} {interaction} responding={$responding.has(agent.pane_id)} />
+        {:else}
+          <p class="conversation-answer-prompt">{approvalPromptPreview(agent)}</p>
+          {#if $responding.has(agent.pane_id)}
+            <p class="conversation-composer-status" role="status">Waiting for agent…</p>
+          {:else}
+            <div class="conversation-answer-actions">
+              {#each options as option, index (`${index}:${option}`)}
+                <Button
+                  variant={approvalButtonTone(option, index, options.length) === 'deny' ? 'danger' : approvalButtonTone(option, index, options.length) === 'trust' ? 'trust' : 'default'}
+                  onclick={() => { void relayStore.respond(agent, index, options.length, option); }}
+                >{option.length > 48 ? `${option.slice(0, 45)}...` : option}</Button>
+              {/each}
+            </div>
+          {/if}
+        {/if}
+      </div>
+    {/if}
     <form
       class="conversation-composer"
       aria-label="Send a prompt"
@@ -425,7 +464,7 @@
         onchange={(event) => { void filesSelected(event.currentTarget.files || []); event.currentTarget.value = ''; }}
       />
     </form>
-    {#if inputLocked}
+    {#if inputLocked && !answerable}
       <p class="conversation-composer-status" role="status">Switch to Terminal to handle the pending agent interaction.</p>
     {:else if uploadStatus}
       <p class:error={uploadError} class="conversation-composer-status" role="status">{uploadStatus}</p>

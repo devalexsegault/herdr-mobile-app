@@ -48,6 +48,7 @@ async function boot(page: Page, relays: RelayFixture[] = [], path = '/', options
     const socketCommands: Record<string, unknown>[][] = [];
     let nextInteraction: Record<string, unknown> | null = null;
     let conversationFixture: { entries: unknown[]; total: number } | null = null;
+    let boardFixture: Record<string, unknown> | null = null;
     let autoCommands = true;
 
     class MockSocket {
@@ -255,6 +256,25 @@ async function boot(page: Page, relays: RelayFixture[] = [], path = '/', options
           }));
           return;
         }
+        if (message.type === 'board_subscribe' || message.type === 'board_unsubscribe') return;
+        // The relay bridges board calls verbatim, so the mock answers them the
+        // same way: one fixture entry per method.
+        if (message.type === 'board_rpc') {
+          const method = String(message.method || '');
+          const result = boardFixture ? boardFixture[method] : undefined;
+          queueMicrotask(() => this.server(result === undefined
+            ? {
+              type: 'board_result',
+              request_id: message.request_id,
+              method,
+              ok: false,
+              error: { code: 1, kind: 'not_allowed', message: `no fixture for ${method}` },
+            }
+            : {
+              type: 'board_result', request_id: message.request_id, method, ok: true, result,
+            }));
+          return;
+        }
         if (message.type === 'push_subscribe' || message.type === 'push_unsubscribe') return;
         const phase = message.type === 'answer_question' && nextInteraction
           ? 'advanced'
@@ -291,6 +311,7 @@ async function boot(page: Page, relays: RelayFixture[] = [], path = '/', options
       __relayConversationFixture(fixture: { entries: unknown[]; total: number } | null) {
         conversationFixture = fixture;
       },
+      __relayBoardFixture(fixture: Record<string, unknown> | null) { boardFixture = fixture; },
       __relayAutoCommands(enabled: boolean) { autoCommands = enabled; },
     });
   }, {
@@ -343,6 +364,15 @@ async function setConversationFixture(page: Page, fixture: ConversationFixture |
   }, fixture);
 }
 
+async function setBoardFixture(page: Page, fixture: Record<string, unknown> | null) {
+  await page.evaluate((value) => {
+    const harnessWindow = window as unknown as {
+      __relayBoardFixture(next: Record<string, unknown> | null): void;
+    };
+    harnessWindow.__relayBoardFixture(value);
+  }, fixture);
+}
+
 async function handshake(page: Page, index: number, overrides: Record<string, unknown> = {}) {
   await server(page, index, {
     type: 'push_config', protocol: 2, version: 'abc1234', host: index ? 'mac' : 'fedora',
@@ -355,7 +385,7 @@ async function handshake(page: Page, index: number, overrides: Record<string, un
 const fedora = { id: 'fedora', label: 'Fedora', url: 'wss://fedora.example', token: '' };
 
 test('manages workspace modals, grouped worktrees, and drag ordering', async ({ page }) => {
-  await boot(page, [fedora]);
+  await boot(page, [fedora], '/#agents');
   await expect.poll(() => socketCount(page)).toBe(1);
   await handshake(page, 0, {
     capabilities: ['attention_classification', 'directory_browser', 'workspace_management', 'workspace_reorder_block', 'worktree_management'],
@@ -512,7 +542,7 @@ test('manages workspace modals, grouped worktrees, and drag ordering', async ({ 
 });
 
 test('groups working agents and synchronizes tab order in both directions', async ({ page }) => {
-  await boot(page, [fedora]);
+  await boot(page, [fedora], '/#agents');
   await expect.poll(() => socketCount(page)).toBe(1);
   await handshake(page, 0, {
     capabilities: ['attention_classification', 'tab_reorder'],
@@ -567,7 +597,7 @@ test('groups working agents and synchronizes tab order in both directions', asyn
 });
 
 test('defaults to the mixed workspace layout and separates state sections on demand', async ({ page }) => {
-  await boot(page, [fedora]);
+  await boot(page, [fedora], '/#agents');
   await expect.poll(() => socketCount(page)).toBe(1);
   await handshake(page, 0, { capabilities: ['attention_classification'] });
   await server(page, 0, {
@@ -643,7 +673,7 @@ test('keeps activity cards inside the page and confirms permanent deletion', asy
     ],
   });
 
-  await page.getByRole('button', { name: 'Activity history' }).click();
+  await page.locator('.tab-bar').getByRole('button', { name: 'Activity' }).click();
   const activity = page.getByRole('button', { name: /codex completed/ });
   await expect(page.getByRole('heading', { name: 'Last 24 hours' })).toBeVisible();
   await expect(page.locator('.activity-summary-metrics > div').filter({ hasText: 'Completed' })).toContainText('1');
@@ -692,7 +722,7 @@ test('sizes captured activity text with terminal typography', async ({ page }) =
     }],
   });
 
-  await page.getByRole('button', { name: 'Activity history' }).click();
+  await page.locator('.tab-bar').getByRole('button', { name: 'Activity' }).click();
   await page.getByRole('button', { name: /omp completed/ }).click();
   const extract = page.getByRole('region', { name: 'Captured response' }).locator('pre');
   await expect(extract).toContainText('Response line 16');
@@ -777,7 +807,7 @@ test('imports quick setup and merges agents from multiple relays', async ({ page
     '/#setup=0123456789abcdef0123456789abcdef&label=Fedora%20Workstation&relay=wss%3A%2F%2Frelay-fedora.example.com',
     { standalone: true, navigatorStandalone: true },
   );
-  await expect(page.getByRole('button', { name: 'Activity history' }).locator('svg')).toBeVisible();
+  await expect(page.locator('.tab-bar').getByRole('button', { name: 'Activity' })).toBeVisible();
   await expect.poll(() => socketCount(page)).toBe(1);
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('herdr_relays') || '[]')[0]))
     .toMatchObject({
@@ -827,7 +857,7 @@ test('imports quick setup and merges agents from multiple relays', async ({ page
 });
 
 test('sorts a cold idle snapshot by the latest Herdr activity', async ({ page }) => {
-  await boot(page, [fedora]);
+  await boot(page, [fedora], '/#agents');
   await expect.poll(() => socketCount(page)).toBe(1);
   await handshake(page, 0);
   await server(page, 0, {
@@ -858,7 +888,7 @@ test('sorts a cold idle snapshot by the latest Herdr activity', async ({ page })
 });
 
 test('keeps an opened workspace expanded across tab navigation and inventory refreshes', async ({ page }) => {
-  await boot(page, [fedora]);
+  await boot(page, [fedora], '/#agents');
   await expect.poll(() => socketCount(page)).toBe(1);
   await handshake(page, 0);
   const agents = [
@@ -942,7 +972,7 @@ test('centers plan keys and enables text only for the terminal editor', async ({
       options: ['Approve once', 'Deny'],
     }],
   });
-  await expect(page.getByRole('heading', { name: 'Needs inspection' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Needs you/ })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Approve once' })).toBeHidden();
   await page.getByRole('button', { name: 'Open Old controls on Fedora' }).click();
   const terminal = page.getByRole('log');
@@ -3331,7 +3361,7 @@ test('reads and replies from native conversation history', async ({ page }) => {
   });
 
   await page.getByRole('button', { name: 'Open History app on Fedora' }).click();
-  await page.getByRole('button', { name: 'Conversation history' }).click();
+  await page.locator('.mode-switch').getByRole('button', { name: 'Chat' }).click();
   await expect(page.getByRole('heading', { name: 'Conversation', exact: true })).toBeVisible();
   await expect(page.getByText('middle retained answer')).toBeVisible();
   await expect(page.getByText('latest retained question')).toBeVisible();
@@ -3445,11 +3475,13 @@ test('reads and replies from native conversation history', async ({ page }) => {
     updated_at: 2,
   });
   await expect(composer).toBeDisabled();
-  await expect(page.getByText('Switch to Terminal to handle the pending agent interaction.')).toBeVisible();
+  // The approval is answered here now, above the composer, instead of sending
+  // the reader to the raw terminal to find the prompt.
+  await expect(page.locator('.conversation-answer').getByRole('button', { name: 'Approve once' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Terminal view' }).click();
+  await page.locator('.mode-switch').getByRole('button', { name: 'Terminal' }).click();
   await expect(page.getByRole('combobox', { name: 'Prompt' })).toBeVisible();
-  await page.getByRole('button', { name: 'Conversation history' }).click();
+  await page.locator('.mode-switch').getByRole('button', { name: 'Chat' }).click();
   await expect(page.getByRole('textbox', { name: 'Prompt' })).toBeVisible();
   await page.getByRole('button', { name: 'Back' }).click();
   await expect(page.getByRole('button', { name: 'Open History app on Fedora' })).toBeVisible();
@@ -3509,7 +3541,7 @@ test('shows tool-only agent turns only in full history and decodes their argumen
   });
 
   await page.getByRole('button', { name: 'Open Tool history on Fedora' }).click();
-  await page.getByRole('button', { name: 'Conversation history' }).click();
+  await page.locator('.mode-switch').getByRole('button', { name: 'Chat' }).click();
   await expect(page.getByRole('heading', { name: 'Conversation', exact: true })).toBeVisible();
   await expect(page.getByText('Probe finished.')).toBeVisible();
 
@@ -3592,7 +3624,7 @@ test('opens a long conversation at its newest turn and holds the pin', async ({ 
   await setConversationFixture(page, { entries, total: entries.length });
 
   await page.getByRole('button', { name: 'Open Long conversation on Fedora' }).click();
-  await page.getByRole('button', { name: 'Conversation history' }).click();
+  await page.locator('.mode-switch').getByRole('button', { name: 'Chat' }).click();
   const list = page.locator('.conversation-list');
   const bottomGap = () => list.evaluate((element) =>
     element.scrollHeight - element.scrollTop - element.clientHeight);
@@ -3663,7 +3695,8 @@ test('inspects workspace files and Git changes without write controls', async ({
   });
 
   await page.getByRole('button', { name: 'Open Workspace app on Fedora' }).click();
-  await page.getByRole('button', { name: 'Inspect workspace' }).click();
+  await page.getByRole('button', { name: 'Manage agent' }).click();
+  await page.getByRole('button', { name: 'Inspect Workspace' }).click();
   const dialog = page.getByRole('dialog', { name: 'Workspace' });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText('/work/mobile', { exact: true })).toBeVisible();
@@ -3884,7 +3917,8 @@ test('finds and highlights matches across virtualized terminal output', async ({
     content: lines.join('\n'),
   });
 
-  await page.getByRole('button', { name: 'Find in terminal', exact: true }).click();
+  await page.getByRole('button', { name: 'Manage agent' }).click();
+  await page.getByRole('button', { name: 'Find in Terminal' }).click();
   await expect(page.getByText('Type to find', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Previous match' }).locator('svg.find-action-symbol')).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Next match' }).locator('svg.find-action-symbol')).toHaveCount(1);
@@ -4052,16 +4086,25 @@ test('scales and expands the prompt composer for multiline text', async ({ page 
     return textarea.scrollHeight > textarea.clientHeight && getComputedStyle(textarea).overflowY === 'auto';
   })).toBe(true);
 
-  await page.getByRole('button', { name: 'Settings' }).click();
+  const openSettings = async () => {
+    await page.getByRole('button', { name: 'Back' }).click();
+    await page.getByRole('button', { name: /Settings/ }).click();
+  };
+  const backToAgent = async () => {
+    await page.getByRole('button', { name: 'Back' }).click();
+    await page.getByRole('button', { name: 'Open Composer app on Fedora' }).click();
+  };
+
+  await openSettings();
   const sizes = page.getByRole('group', { name: 'Interface Size' });
   await sizes.getByRole('button', { name: 'Regular' }).click();
-  await page.getByRole('button', { name: 'Back' }).click();
+  await backToAgent();
   await composer.fill('One line');
   const regularHeight = (await composer.boundingBox())!.height;
 
-  await page.getByRole('button', { name: 'Settings' }).click();
+  await openSettings();
   await sizes.getByRole('button', { name: 'Large' }).click();
-  await page.getByRole('button', { name: 'Back' }).click();
+  await backToAgent();
   await composer.fill('One line');
   const largeHeight = (await composer.boundingBox())!.height;
 
@@ -5333,4 +5376,127 @@ test('interrupts and sends function keys from the terminal pad', async ({ page }
   await page.getByRole('button', { name: 'Function keys' }).first().click();
   await page.getByRole('button', { name: 'F5', exact: true }).click();
   await expect.poll(() => keysSent(['f5'])).toBe(1);
+});
+
+// --- Refonte: tabs, triage-first home, conversation-first agents, board -----
+
+test('opens an agent as a conversation and keeps the terminal one tap away', async ({ page }) => {
+  await boot(page, [fedora]);
+  await expect.poll(() => socketCount(page)).toBe(1);
+  await handshake(page, 0, {
+    capabilities: ['attention_classification', 'conversation_history', 'structured_questions'],
+  });
+  await setConversationFixture(page, {
+    entries: [
+      { id: 'turn-1', timestamp: '2026-08-12T09:00:00Z', role: 'user', text: 'migrate the store' },
+      { id: 'turn-2', timestamp: '2026-08-12T09:00:02Z', role: 'assistant', text: 'transport extracted' },
+    ],
+    total: 2,
+  });
+  await server(page, 0, {
+    type: 'agents',
+    agents: [{
+      pane_id: 'w1:p1', status: 'working', project: 'Mobile app', agent: 'claude',
+      session: 'abc', conversation_history_available: true,
+    }],
+  });
+
+  await page.getByRole('button', { name: 'Open Mobile app on Fedora' }).click();
+
+  await expect(page.getByText('transport extracted')).toBeVisible();
+  const modes = page.locator('.mode-switch');
+  await expect(modes.getByRole('button', { name: 'Chat' })).toHaveAttribute('aria-pressed', 'true');
+  await modes.getByRole('button', { name: 'Terminal' }).click();
+  await expect(page.getByRole('log')).toBeVisible();
+});
+
+test('answers an approval inside the conversation instead of sending it to the terminal', async ({ page }) => {
+  await boot(page, [fedora]);
+  await expect.poll(() => socketCount(page)).toBe(1);
+  await handshake(page, 0, {
+    capabilities: ['attention_classification', 'conversation_history', 'structured_questions'],
+  });
+  await setConversationFixture(page, { entries: [], total: 0 });
+  await server(page, 0, {
+    type: 'agents',
+    agents: [{
+      pane_id: 'w1:p1', status: 'blocked', project: 'Mobile app', agent: 'claude',
+      session: 'abc', conversation_history_available: true,
+      attention_kind: 'approval', attention_capable: true,
+      prompt: 'Run rm -rf dist?', options: ['Approve once', 'Deny'],
+    }],
+  });
+
+  await page.getByRole('button', { name: 'Open Mobile app on Fedora' }).click();
+
+  const answer = page.locator('.conversation-answer');
+  await expect(answer).toBeVisible();
+  await answer.getByRole('button', { name: 'Approve once' }).click();
+  await expect.poll(async () => (await commands(page)).some(
+    (command) => command.type === 'respond' && command.choice === 'Approve once',
+  )).toBe(true);
+});
+
+test('reads a board through the relay bridge and opens one card', async ({ page }) => {
+  await boot(page, [fedora]);
+  await expect.poll(() => socketCount(page)).toBe(1);
+  await handshake(page, 0, {
+    capabilities: ['attention_classification', 'board_v1'],
+    board: {
+      version: '0.16.1', herdr_connected: true, active_runs: 1, queued_runs: 0,
+      methods: ['board.get', 'card.get', 'card.move', 'project.list'],
+    },
+  });
+  const card = {
+    id: 41, board_id: 2, column_id: 20, title: 'Extract the transport', description: 'Keep the public API.',
+    status: 'running', position: 0, harness: 'claude', model: '', effort: '', permission_mode: '',
+    session: null, session_id: null, space_kind: 'workspace', space_ref: 'w1', space_cwd: '/work',
+    labels: {}, awaiting_reason: null, created_at: '2026-09-01 10:00:00', updated_at: '2026-09-01 10:05:00',
+    archived_at: null,
+  };
+  const columns = [
+    { id: 20, board_id: 2, name: 'Auto', position: 0, trigger: 'auto', fresh_session: false },
+    { id: 21, board_id: 2, name: 'Review', position: 1, trigger: 'manual', fresh_session: false },
+  ];
+  await setBoardFixture(page, {
+    'project.list': {
+      projects: [{
+        project: { id: 2, name: 'mobile-relay', scope_path: '/work', archived_at: null },
+        boards: [{ id: 2, name: 'main', project_id: 2, scope_path: '/work', archived_at: null }],
+        selected_board_id: 2,
+      }],
+      selected_project_id: 2,
+    },
+    'board.get': {
+      board: { id: 2, name: 'main', project_id: 2, scope_path: '/work', archived_at: null },
+      columns,
+      cards: [card],
+      active_runs: [{ card_id: 41, started_at: '2026-09-01 10:05:00' }],
+    },
+    'board.select': {},
+    'card.get': { card, comments: [{ id: 5, card_id: 41, body: 'keep the alias', created_at: '2026-09-01 10:06:00' }], runs: [] },
+  });
+
+  await page.locator('.tab-bar').getByRole('button', { name: 'Board' }).click();
+
+  await expect(page.getByRole('button', { name: /mobile-relay/ })).toBeVisible();
+  // An auto column is labelled as what it does, because dropping a card into it
+  // starts a real agent.
+  await expect(page.getByText('starts an agent')).toBeVisible();
+  await page.locator('.board-card').first().click();
+
+  await expect(page.getByRole('heading', { name: 'Extract the transport' })).toBeVisible();
+  await expect(page.getByText('keep the alias')).toBeVisible();
+  // A card with an open run cannot be moved until the run ends.
+  await expect(page.getByRole('button', { name: 'Review' })).toBeDisabled();
+});
+
+test('hides the board tab when the relay has no board daemon', async ({ page }) => {
+  await boot(page, [fedora]);
+  await expect.poll(() => socketCount(page)).toBe(1);
+  await handshake(page, 0);
+
+  await page.locator('.tab-bar').getByRole('button', { name: 'Board' }).click();
+
+  await expect(page.getByText('No board yet')).toBeVisible();
 });

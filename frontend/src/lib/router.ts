@@ -3,13 +3,21 @@ import { shouldRetainSetupFragment } from './config';
 import { parseNotificationTarget } from './protocol';
 import type { NotificationTarget } from './types';
 
+// The three roots of the tab bar. Everything else is a view pushed over the
+// tab it was opened from: a terminal, a card, a launch form, settings. Only the
+// roots show the bar, so a pushed view keeps the whole screen.
+export type TabId = 'today' | 'board' | 'activity';
+
 export type ViewState =
   | { view: 'agents' }
   | { view: 'settings' }
   | { view: 'workspaces' }
+  | { view: 'agents_all' }
   | { view: 'launch'; relayId?: string; workspaceId?: string; cwd?: string }
   | { view: 'activity' }
   | { view: 'activity_detail'; key: string }
+  | { view: 'board' }
+  | { view: 'board_card'; cardId: number }
   | { view: 'terminal'; paneId: string }
   | { view: 'history'; paneId: string }
   | { view: 'notification'; target: NotificationTarget };
@@ -20,6 +28,26 @@ type HistoryViewState = ViewState & {
 };
 
 export const currentView = writable<ViewState>({ view: 'agents' });
+
+const tabRoots: Record<TabId, ViewState> = {
+  today: { view: 'agents' },
+  board: { view: 'board' },
+  activity: { view: 'activity' },
+};
+
+// A view either IS a tab root or sits above one. Returning null is what hides
+// the tab bar, so a terminal, a card or a settings screen never competes for
+// the bottom of the phone with the keyboard and the composer.
+export function tabForView(state: ViewState): TabId | null {
+  if (state.view === 'agents') return 'today';
+  if (state.view === 'board') return 'board';
+  if (state.view === 'activity') return 'activity';
+  return null;
+}
+
+export function tabRoot(tab: TabId): ViewState {
+  return tabRoots[tab];
+}
 let viewIndex = 0;
 
 function showView(state: ViewState): void {
@@ -30,6 +58,7 @@ function showView(state: ViewState): void {
 export function stateFromLocation(locationValue: Pick<Location, 'hash'> = location): ViewState {
   if (locationValue.hash === '#settings') return { view: 'settings' };
   if (locationValue.hash === '#workspaces') return { view: 'workspaces' };
+  if (locationValue.hash === '#agents') return { view: 'agents_all' };
   if (locationValue.hash === '#launch') return { view: 'launch' };
   const launchTarget = locationValue.hash.match(/^#launch=(.+)$/);
   if (launchTarget) {
@@ -46,6 +75,9 @@ export function stateFromLocation(locationValue: Pick<Location, 'hash'> = locati
     }
   }
   if (locationValue.hash === '#activity') return { view: 'activity' };
+  if (locationValue.hash === '#board') return { view: 'board' };
+  const boardCard = locationValue.hash.match(/^#card=(\d+)$/);
+  if (boardCard) return { view: 'board_card', cardId: Number(boardCard[1]) };
   const activityDetail = locationValue.hash.match(/^#activity=(.+)$/);
   if (activityDetail) {
     try {
@@ -81,6 +113,7 @@ export function stateFromLocation(locationValue: Pick<Location, 'hash'> = locati
 export function viewUrl(state: ViewState): string {
   if (state.view === 'settings') return '#settings';
   if (state.view === 'workspaces') return '#workspaces';
+  if (state.view === 'agents_all') return '#agents';
   if (state.view === 'launch') {
     if (!state.workspaceId) return '#launch';
     return `#launch=${encodeURIComponent(JSON.stringify({
@@ -90,6 +123,8 @@ export function viewUrl(state: ViewState): string {
     }))}`;
   }
   if (state.view === 'activity') return '#activity';
+  if (state.view === 'board') return '#board';
+  if (state.view === 'board_card') return `#card=${state.cardId}`;
   if (state.view === 'activity_detail') return `#activity=${encodeURIComponent(state.key)}`;
   if (state.view === 'terminal') return `#pane=${encodeURIComponent(state.paneId)}`;
   if (state.view === 'history') return `#history=${encodeURIComponent(state.paneId)}`;

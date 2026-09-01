@@ -37,7 +37,13 @@ import { constants, gzipSync } from 'node:zlib';
 // Raised from 127 KiB for compact conversation tool cards and pending-lease
 // terminal recovery: payload formatting/clamping and bounded resize handling
 // both ship in the single bootstrap bundle.
-const limitKiB = 128;
+// Raised from 128 KiB for the navigation refonte: the tab bar and its three
+// roots, the triage-first Today screen, the conversation-side approval and
+// question panel, and the whole board client (protocol types, RPC wrappers,
+// board, card and compose views) add 9,881 B gzip. The release contract ships
+// one `assets/app.js`, so none of it can be split out of the bootstrap
+// payload, and the previous ceiling left 569 B of headroom.
+const limitKiB = 138;
 const limit = limitKiB * 1024;
 const root = resolve(process.argv[2] || 'dist');
 const files = ['index.html', 'assets/app.js', 'assets/app.css'];

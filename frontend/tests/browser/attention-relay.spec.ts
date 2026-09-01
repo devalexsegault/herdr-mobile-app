@@ -30,7 +30,7 @@ test('drives captured attention panes through the real relay', async ({ page }) 
   }, { relayURL: wsURL });
   await page.goto('/');
 
-  const approvalCard = page.locator('.agent-card').filter({ hasText: 'qoder-approval' });
+  const approvalCard = page.locator('.waiting-card').filter({ hasText: 'qoder-approval' });
   await expect(approvalCard.getByRole('button', { name: 'Allow once', exact: true })).toBeVisible();
   await approvalCard.getByRole('button', { name: /Open qoder-approval on Captured relay/ }).click();
   await expect(page.getByRole('button', { name: 'Allow once', exact: true })).toBeVisible();
@@ -214,8 +214,9 @@ test('drives captured attention panes through the real relay', async ({ page }) 
   await expect(page.getByRole('button', { name: 'Submit', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Back' }).click();
 
-  const settingsCard = page.locator('.agent-card').filter({ hasText: 'qoder-settings' });
-  await expect(page.getByRole('heading', { name: 'Needs inspection' })).toBeVisible();
+  const settingsCard = page.locator('.waiting-card').filter({ hasText: 'qoder-settings' });
+  // Blocked agents and agents that only need a look share one triage list.
+  await expect(page.getByRole('heading', { name: /Needs you/ })).toBeVisible();
   await expect(settingsCard.getByRole('button', { name: 'Yes', exact: true })).toHaveCount(0);
   await settingsCard.getByRole('button', {
     name: /Open qoder-settings on Captured relay/,
