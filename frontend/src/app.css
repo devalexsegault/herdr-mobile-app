@@ -10,49 +10,55 @@
 /* One source for the sticky header's height: three full-height layouts size
    themselves against it, and hardcoding the value in each one silently leaves
    a gap at the bottom of the page the moment the bar changes. */
-:root { --app-header-height: 2.75rem; }
+:root { --app-header-height: 3.25rem; }
 
+/* The default themes run warm: a neutral-grey product reads as a terminal, and
+   this one is meant to be lived in. Surfaces step 12 11 0F -> 1A1917 -> 222120
+   so a card lifts off the ground without a heavy border, and the accent is the
+   only saturated colour on a quiet screen. */
 :root,
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --background: #0a0a0a;
-  --foreground: #ededed;
-  --card: #151515;
-  --card-hover: #1d1d1d;
-  --muted: #999;
-  --border: #303030;
-  --input: #202020;
-  --primary: #4b9eff;
-  --primary-foreground: #fff;
-  --secondary: #292929;
-  --danger: #e85d68;
-  --success: #50c878;
-  --warning: #e6b450;
-  --trust: #a178df;
-  --terminal: #080808;
-  --terminal-text: #e5e5e5;
-  --terminal-link: #80bfff;
+  --background: #12110f;
+  --foreground: #f3f0eb;
+  --card: #1a1917;
+  --card-hover: #222120;
+  --muted: #9c968d;
+  --border: #2c2a27;
+  --input: #1a1917;
+  --primary: #7e8cff;
+  --primary-foreground: #0e0e14;
+  --secondary: #262421;
+  --danger: #f0736a;
+  --success: #5fc28c;
+  --warning: #e5b45e;
+  --trust: #4fc0c0;
+  --terminal: #0d0c0b;
+  --terminal-text: #e6e1d9;
+  --terminal-link: #9aa6ff;
   --terminal-link-visited: #c8a2ff;
 }
 
+/* Paper, not office white: the same warmth as the dark theme, with every
+   semantic colour darkened until it holds its contrast on it. */
 :root[data-theme='light'] {
   color-scheme: light;
-  --background: #f5f5f5;
-  --foreground: #181818;
+  --background: #f7f4ef;
+  --foreground: #1e1c19;
   --card: #fff;
-  --card-hover: #f0f0f0;
-  --muted: #626262;
-  --border: #d4d4d4;
+  --card-hover: #f2eee7;
+  --muted: #6b655c;
+  --border: #e2dcd2;
   --input: #fff;
-  --primary: #1769aa;
+  --primary: #4f5bd5;
   --primary-foreground: #fff;
-  --secondary: #e7e7e7;
-  --danger: #b4232f;
-  --success: #167548;
-  --warning: #9a6500;
-  --trust: #7041a0;
-  --terminal: #151515;
-  --terminal-text: #f0f0f0;
+  --secondary: #ede8e0;
+  --danger: #c43a32;
+  --success: #1f7a4d;
+  --warning: #8a6410;
+  --trust: #17706f;
+  --terminal: #17150f;
+  --terminal-text: #f0ece4;
 }
 
 :root[data-theme='nord'] {
@@ -383,45 +389,64 @@ textarea { min-height: 6.5rem; resize: vertical; }
 .activity-detail-head h2 { flex: 1; font-size: 1rem; margin: 0; }
 
 .conversation-page { display: flex; flex: 1 1 auto; flex-direction: column; gap: .65rem; margin: 0 auto; max-width: 48rem; min-height: 0; padding: .75rem .85rem calc(.75rem + env(safe-area-inset-bottom)); width: 100%; }
-.conversation-toolbar { align-items: center; display: flex; flex: 0 0 auto; gap: .75rem; justify-content: space-between; }
-.conversation-toolbar h2 { font-size: 1rem; margin: 0; }
-.conversation-toolbar p { color: var(--muted); font-size: .68rem; margin: .15rem 0 0; }
-.conversation-search { flex: 0 1 16rem; }
-.conversation-search input { min-height: 2.35rem; padding: .48rem .62rem; }
+.conversation-toolbar { align-items: center; display: flex; flex: 0 0 auto; gap: .6rem; justify-content: space-between; padding-bottom: .5rem; }
+.conversation-count { color: var(--muted); font-size: .68rem; margin: 0; white-space: nowrap; }
+.conversation-search { flex: 0 1 10rem; }
+.conversation-search input { border-radius: 999px; min-height: 2.1rem; padding: .4rem .8rem; }
+/* The author line is a whisper: the reader already knows who is talking from
+   the side the message sits on. */
+.conversation-entry > header time { font-variant-numeric: tabular-nums; }
+.conversation-entry.conversation-user > header { justify-content: flex-end; }
 .conversation-older { display: flex; flex: 0 0 auto; justify-content: center; }
 .conversation-warning { color: var(--warning); flex: 0 0 auto; font-size: .7rem; margin: 0; text-align: center; }
 .conversation-warning.error { color: var(--danger); }
 .conversation-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: .1rem .05rem .6rem; }
-.conversation-input-area { flex: 0 0 auto; margin-top: auto; min-width: 0; }
-.conversation-composer { align-items: flex-end; display: flex; gap: .45rem; }
+.conversation-input-area { border-top: 1px solid var(--border); flex: 0 0 auto; margin-top: auto; min-width: 0; padding-top: .7rem; }
+.conversation-composer { align-items: flex-end; display: flex; gap: .5rem; }
 .conversation-composer-status { color: var(--muted); font-size: .68rem; margin: .35rem .2rem 0; }
 .conversation-composer-status.error { color: var(--danger); }
 /* The turns live in their own box so a ResizeObserver can watch the height of
    the content itself: the scroller's box never changes when a turn is added or
    when wrapped markdown settles, which is what the bottom pin has to follow. */
-.conversation-stream { display: flex; flex-direction: column; gap: .55rem; }
-.conversation-entry { align-self: flex-start; background: var(--card); border: 1px solid var(--border); border-radius: .75rem; max-width: min(94%, 42rem); padding: .72rem .78rem; }
-.conversation-entry.conversation-user { align-self: flex-end; background: color-mix(in srgb, var(--primary) 12%, var(--card)); border-color: color-mix(in srgb, var(--primary) 38%, var(--border)); }
-.conversation-entry > header { align-items: center; display: flex; gap: .5rem; justify-content: space-between; margin-bottom: .35rem; }
-.conversation-entry > header strong { flex: 1 1 auto; font-size: .72rem; min-width: 0; }
+/* A read, not a log. The agent's turn is plain prose on the page, the way a
+   long answer wants to be read; only the person's own message is a bubble, so
+   the eye can find what was asked without a frame around every paragraph. */
+.conversation-stream { display: flex; flex-direction: column; gap: 1.15rem; }
+.conversation-entry { align-self: stretch; background: transparent; border: 0; border-radius: 0; max-width: 100%; padding: 0; }
+.conversation-entry.conversation-user {
+  align-self: flex-end;
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  border-radius: 1.15rem 1.15rem .35rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  max-width: min(88%, 34rem);
+  padding: .7rem .9rem;
+}
+/* The time follows what was said, the way a sent message reads, instead of
+   pushing the sentence down the bubble. */
+.conversation-entry.conversation-user > header { margin: .35rem 0 0; order: 2; }
+.conversation-entry > header { align-items: center; display: flex; gap: .5rem; justify-content: space-between; margin-bottom: .3rem; }
+.conversation-entry > header strong { color: var(--muted); flex: 1 1 auto; font-size: .7rem; font-weight: 650; letter-spacing: .03em; min-width: 0; text-transform: uppercase; }
+.conversation-entry.conversation-user > header strong { color: var(--muted); }
 .conversation-entry > header time, .conversation-entry > small { color: var(--muted); font-size: .62rem; }
 .conversation-entry-actions { align-items: center; display: flex; flex: 0 0 auto; gap: .25rem; }
-.copy-conversation-markdown { color: var(--muted); height: 1.7rem; min-height: 1.7rem; opacity: .72; width: 1.7rem; }
+.copy-conversation-markdown { color: var(--muted); height: 1.7rem; min-height: 1.7rem; opacity: .42; width: 1.7rem; }
 .copy-conversation-markdown:hover, .copy-conversation-markdown:focus-visible { opacity: 1; }
 .conversation-entry > small { display: block; margin-top: .4rem; }
 .conversation-toolbar-actions { align-items: center; display: flex; flex: 1; gap: .55rem; justify-content: flex-end; min-width: 0; }
 .conversation-mode { background: var(--secondary); border-radius: .48rem; display: flex; flex: 0 0 auto; padding: .14rem; }
 .conversation-mode button { background: transparent; border: 0; border-radius: .35rem; color: var(--muted); cursor: pointer; font-size: .62rem; min-height: 1.9rem; padding: .3rem .5rem; }
 .conversation-mode button.active { background: var(--card); color: var(--foreground); font-weight: 700; }
-.conversation-markdown { font-size: .8rem; line-height: 1.55; overflow-wrap: anywhere; }
+.conversation-markdown { font-size: .94rem; line-height: 1.62; overflow-wrap: anywhere; }
 .conversation-markdown > :first-child { margin-top: 0; }
 .conversation-markdown > :last-child { margin-bottom: 0; }
-.conversation-markdown p { margin: .55rem 0; }
-.conversation-markdown :is(h3, h4, h5, h6) { font-size: .86rem; line-height: 1.35; margin: .85rem 0 .4rem; }
+.conversation-markdown p { margin: .7rem 0; }
+.conversation-markdown :is(h3, h4, h5, h6) { font-size: .98rem; line-height: 1.35; margin: 1.1rem 0 .45rem; }
 .conversation-markdown :is(ul, ol) { margin: .5rem 0; padding-left: 1.35rem; }
 .conversation-markdown li + li { margin-top: .25rem; }
 .conversation-markdown blockquote { border-left: 3px solid var(--border); color: var(--muted); margin: .6rem 0; padding-left: .7rem; }
-.conversation-markdown pre { background: var(--terminal); border: 1px solid var(--border); border-radius: .5rem; color: var(--terminal-text); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .72rem; line-height: 1.5; margin: .55rem 0; max-width: 100%; overflow: auto; padding: .65rem; tab-size: 2; white-space: pre; }
+.conversation-markdown pre { background: var(--terminal); border: 1px solid var(--border); border-radius: .75rem; color: var(--terminal-text); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .76rem; line-height: 1.55; margin: .75rem 0; max-width: 100%; overflow: auto; padding: .8rem .85rem; tab-size: 2; white-space: pre; }
 .conversation-markdown :not(pre) > code { background: var(--secondary); border: 1px solid var(--border); border-radius: .25rem; font-family: ui-monospace, monospace; font-size: .9em; padding: .08rem .22rem; }
 .conversation-markdown a { color: var(--primary); text-decoration: underline; text-underline-offset: .14em; }
 .conversation-markdown mark { background: color-mix(in srgb, var(--warning) 60%, transparent); border-radius: .12rem; color: inherit; }
@@ -430,15 +455,17 @@ textarea { min-height: 6.5rem; resize: vertical; }
 .conversation-markdown table { border-collapse: collapse; font-size: .72rem; min-width: 100%; width: max-content; }
 .conversation-markdown :is(th, td) { border: 1px solid var(--border); padding: .3rem .45rem; text-align: left; vertical-align: top; }
 .conversation-markdown th { background: color-mix(in srgb, var(--secondary) 70%, transparent); font-weight: 700; white-space: nowrap; }
-.conversation-tools { border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: .35rem; margin-top: .65rem; padding-top: .55rem; }
-.conversation-tools details { background: color-mix(in srgb, var(--secondary) 55%, transparent); border: 1px solid var(--border); border-radius: .5rem; overflow: hidden; }
+.conversation-tools { display: flex; flex-direction: column; gap: .3rem; margin-top: .7rem; }
+.conversation-tools details { background: transparent; border: 1px solid transparent; border-radius: .7rem; overflow: hidden; }
+.conversation-tools details[open] { background: color-mix(in srgb, var(--secondary) 45%, transparent); border-color: var(--border); }
 .conversation-tools details.error { border-color: color-mix(in srgb, var(--danger) 55%, var(--border)); }
-.conversation-tools summary { align-items: center; cursor: pointer; display: flex; gap: .38rem; list-style: none; padding: .42rem .5rem; }
+.conversation-tools summary { align-items: center; border-radius: .7rem; color: var(--muted); cursor: pointer; display: flex; gap: .45rem; list-style: none; min-height: 2.1rem; padding: .35rem .5rem; }
+.conversation-tools summary:hover { background: color-mix(in srgb, var(--secondary) 45%, transparent); }
 .conversation-tools summary::-webkit-details-marker { display: none; }
 .conversation-tools summary > span { color: var(--muted); font-family: ui-monospace, monospace; width: .7rem; }
 .conversation-tools details[open] summary > span { transform: rotate(90deg); }
 .conversation-tools details.error summary > span { color: var(--danger); transform: none; }
-.conversation-tools summary strong { flex: 1; font-family: ui-monospace, monospace; font-size: .67rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conversation-tools summary strong { color: var(--muted); flex: 1; font-family: ui-monospace, monospace; font-size: .72rem; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .conversation-tools summary small { color: var(--muted); font-size: .58rem; }
 .conversation-tool-detail { border-top: 1px solid var(--border); padding: .55rem; }
 .conversation-tool-detail section + section { margin-top: .55rem; }
@@ -633,8 +660,8 @@ textarea { min-height: 6.5rem; resize: vertical; }
 .jump-bottom { background: var(--primary); border: 0; border-radius: 50%; bottom: .9rem; color: var(--primary-foreground); height: 2.5rem; position: absolute; right: 1rem; width: 2.5rem; }
 .terminal-bottom { background: var(--background); border-top: 1px solid var(--border); flex: 0 0 auto; padding-bottom: env(safe-area-inset-bottom); position: relative; }
 .term-input { align-items: flex-end; display: flex; gap: .45rem; padding: .55rem; }
-.composer-field { background: var(--input); border: 1px solid var(--border); border-radius: .68rem; display: flex; flex: 1; min-width: 0; position: relative; }
-.composer-field:focus-within { border-color: var(--primary); }
+.composer-field { background: var(--input); border: 1px solid var(--border); border-radius: 1.25rem; display: flex; flex: 1; min-width: 0; padding: .1rem .25rem; position: relative; }
+.composer-field:focus-within { border-color: color-mix(in srgb, var(--primary) 55%, var(--border)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent); }
 .generic-menu-actions { border-top: 1px solid var(--border); padding: .5rem .55rem; }
 .generic-menu-actions > header { align-items: baseline; display: flex; gap: .45rem; margin-bottom: .42rem; }
 .generic-menu-actions > header strong { font-size: .7rem; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -770,9 +797,31 @@ textarea { min-height: 6.5rem; resize: vertical; }
 .update-progress-error p, .update-progress-success { font-size: .72rem; line-height: 1.45; margin: .3rem 0 0; }
 .update-progress-success { color: var(--success); font-weight: 700; text-align: center; }
 .update-progress-actions { grid-template-columns: 1fr; }
-.toast { background: var(--foreground); border: 0; border-radius: .65rem; box-shadow: 0 .8rem 2rem rgb(0 0 0 / .5); color: var(--background); left: 50%; margin: 0; max-width: calc(100% - 2rem); opacity: 0; padding: .75rem 1rem; pointer-events: none; position: fixed; top: calc(4rem + env(safe-area-inset-top)); transform: translate(-50%, -1rem); transition: opacity .15s, transform .15s; z-index: 80; }
+/* A message about what just happened, not a slab of colour over the thing it
+   is talking about: a raised surface, with the tone carried by a left rule. */
+.toast {
+  background: var(--card-hover);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--muted);
+  border-radius: .8rem;
+  box-shadow: 0 .9rem 2.2rem rgb(0 0 0 / .45);
+  color: var(--foreground);
+  font-size: .84rem;
+  left: 50%;
+  line-height: 1.45;
+  margin: 0;
+  max-width: calc(100% - 2rem);
+  opacity: 0;
+  padding: .7rem .9rem;
+  pointer-events: none;
+  position: fixed;
+  top: calc(4rem + env(safe-area-inset-top));
+  transform: translate(-50%, -1rem);
+  transition: opacity .15s, transform .15s;
+  z-index: 80;
+}
 .toast.visible { opacity: 1; transform: translate(-50%, 0); }
-.toast.error { background: var(--danger); color: #fff; }
+.toast.error { background: var(--card-hover); border-left-color: var(--danger); color: var(--foreground); }
 
 .sr-only { height: 1px; margin: -1px; overflow: hidden; padding: 0; position: absolute; width: 1px; clip: rect(0, 0, 0, 0); white-space: nowrap; }
 
@@ -1176,3 +1225,8 @@ textarea { min-height: 6.5rem; resize: vertical; }
 .card-comment { background: var(--card); border: 1px solid var(--border); border-radius: .7rem; padding: .6rem .7rem; }
 .card-comment-head { color: var(--muted); font-size: .68rem; margin-bottom: .25rem; }
 .card-comment p { font-size: .82rem; line-height: 1.5; margin: 0; white-space: pre-wrap; }
+
+/* Chat surface: the send control is a filled circle, the attach control stays
+   quiet, and both keep the 44 px target. */
+.conversation-composer :global(.button-icon), .conversation-composer .button-icon { border-radius: 999px; }
+.conversation-composer button[type='submit'] { border-radius: 999px; }

@@ -22,9 +22,11 @@ import {
 } from './config';
 import { setTerminalScheme } from './terminal';
 
+// The house theme is the default; nord, solarized, rose and latte stay as
+// deliberate ports of palettes people already run on their desktop.
 function savedTheme(): Theme {
   const value = localStorage.getItem(THEME_KEY);
-  return THEMES.includes(value as Theme) ? value as Theme : 'nord';
+  return THEMES.includes(value as Theme) ? value as Theme : 'dark';
 }
 
 function savedInterfaceSize(): InterfaceSize {

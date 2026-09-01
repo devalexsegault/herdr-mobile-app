@@ -134,6 +134,13 @@
   const waitingCount = $derived($agents.filter(
     (agent) => agentNeedsResponse(agent) || agentNeedsInspection(agent),
   ).length);
+  const headerSummary = $derived.by(() => {
+    const relayCount = $relays.length;
+    const agentCount = $agents.length;
+    const agentLabel = agentCount === 1 ? '1 agent' : `${agentCount} agents`;
+    if (relayCount > 1 || connected !== relayCount) return `${connected}/${relayCount} relays · ${agentLabel}`;
+    return agentLabel;
+  });
   const headerTitle = $derived.by(() => {
     if ($currentView.view === 'settings') return 'Settings';
     if ($currentView.view === 'workspaces') return 'Workspaces';
@@ -494,7 +501,7 @@
       <h1>{headerTitle}</h1>
       {#if headerMeta}<span>{headerMeta}</span>{/if}
     </div>
-    {#if $currentView.view === 'agents'}<span class="agent-count">{connected}/{$relays.length} relays{#if $agents.length} · {$agents.length}{/if}</span>{/if}
+    {#if activeTab === 'today'}<span class="agent-count">{headerSummary}</span>{/if}
     <nav aria-label="Application">
       {#if agentView}
         <div class="mode-switch" role="group" aria-label="Agent view">

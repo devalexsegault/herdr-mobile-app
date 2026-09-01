@@ -3365,7 +3365,7 @@ test('reads and replies from native conversation history', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Conversation', exact: true })).toBeVisible();
   await expect(page.getByText('middle retained answer')).toBeVisible();
   await expect(page.getByText('latest retained question')).toBeVisible();
-  await expect(page.getByText('4 recorded messages')).toBeVisible();
+  await expect(page.getByText('4 messages')).toBeVisible();
   await expect(page.getByText(/session log is larger than 16 MB/)).toBeVisible();
   await page.getByRole('button', { name: 'Copy History app message as Markdown' }).click();
   await expect.poll(() => page.evaluate(() => Reflect.get(window, '__copiedConversation')))
@@ -4871,7 +4871,7 @@ test('refreshes agents on return home and preserves shared terminal behavior', a
   });
   const normalizedMacRow = terminal.locator('.ansi-line', { hasText: 'Mac light terminal' });
   await expect(normalizedMacRow).toHaveCSS('background-color', 'rgb(61, 64, 64)');
-  await expect(normalizedMacRow.locator('span')).toHaveCSS('color', 'rgb(236, 239, 244)');
+  await expect(normalizedMacRow.locator('span')).toHaveCSS('color', 'rgb(230, 225, 217)');
 
   const composer = page.getByRole('combobox', { name: 'Prompt' });
   await composer.focus();
@@ -5500,3 +5500,4 @@ test('hides the board tab when the relay has no board daemon', async ({ page }) 
 
   await expect(page.getByText('No board yet')).toBeVisible();
 });
+

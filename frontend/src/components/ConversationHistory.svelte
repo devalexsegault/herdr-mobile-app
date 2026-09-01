@@ -194,7 +194,13 @@
   function formatTimestamp(value: string): string {
     const timestamp = new Date(value);
     if (Number.isNaN(timestamp.getTime())) return '';
-    return timestamp.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+    const today = new Date();
+    const sameDay = timestamp.getFullYear() === today.getFullYear()
+      && timestamp.getMonth() === today.getMonth()
+      && timestamp.getDate() === today.getDate();
+    return sameDay
+      ? timestamp.toLocaleTimeString([], { timeStyle: 'short' })
+      : timestamp.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
   }
 
   async function copyMarkdown(entry: ConversationEntry) {
@@ -306,10 +312,10 @@
 
 <main class="conversation-page" aria-labelledby="conversation-title">
   <header class="conversation-toolbar">
-    <div>
-      <h2 id="conversation-title">Conversation</h2>
-      {#if available && total}<p>{total} recorded {total === 1 ? 'message' : 'messages'}</p>{/if}
-    </div>
+    <h2 id="conversation-title" class="sr-only">Conversation</h2>
+    {#if available && total}
+      <p class="conversation-count">{total} {total === 1 ? 'message' : 'messages'}</p>
+    {/if}
     <div class="conversation-toolbar-actions">
       <div class="conversation-mode" role="group" aria-label="Conversation display">
         <button class:active={mode === 'conversation'} type="button" aria-pressed={mode === 'conversation'} title="Show user prompts and the latest agent answer from each exchange" onclick={() => setMode('conversation')}>Conversation</button>
@@ -362,7 +368,7 @@
         {#each visibleEntries as entry (entry.id)}
           <article class:conversation-user={entry.role === 'user'} class="conversation-entry">
             <header>
-              <strong>{entry.role === 'user' ? 'You' : displayName(agent)}</strong>
+              {#if entry.role !== 'user'}<strong>{String(agent.agent || '').trim() || displayName(agent)}</strong>{/if}
               <span class="conversation-entry-actions">
                 {#if formatTimestamp(entry.timestamp)}<time datetime={entry.timestamp}>{formatTimestamp(entry.timestamp)}</time>{/if}
                 {#if entry.text}

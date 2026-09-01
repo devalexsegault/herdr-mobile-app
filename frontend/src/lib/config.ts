@@ -74,8 +74,8 @@ export function paneLeaseRenewalAllowed(visible: boolean, hiddenAt: number, now:
 }
 
 export const THEME_COLORS: Record<Theme, string> = {
-  dark: '#0a0a0a',
-  light: '#f5f5f5',
+  dark: '#12110f',
+  light: '#f7f4ef',
   nord: '#2e3440',
   solarized: '#002b36',
   rose: '#191724',
