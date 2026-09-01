@@ -42,6 +42,9 @@ type StartRequest struct {
 	Name        string
 	Cwd         string
 	Prompt      string
+	// Session names the Herdr session to start in when no workspace is given.
+	// A qualified WorkspaceID carries its own session and wins.
+	Session string
 }
 
 type StartResult struct {
@@ -53,8 +56,24 @@ type StartResult struct {
 
 type Lifecycle struct {
 	herdr    *herdr.Client
+	sessions *herdr.Sessions
 	profiles *profiles.Resolver
 	home     string
+}
+
+// target picks the session a start lands in and the client that serves it.
+// The prefix comes back so the ids Herdr creates can be qualified on the way
+// out; the raw workspace id is what that client understands.
+func (l *Lifecycle) target(request StartRequest) (client *herdr.Client, prefix, rawWorkspace string) {
+	if l.sessions == nil {
+		return l.herdr, "", request.WorkspaceID
+	}
+	if request.WorkspaceID != "" {
+		prefix, rawWorkspace = herdr.SplitID(request.WorkspaceID)
+	} else {
+		prefix = l.sessions.Prefix(request.Session)
+	}
+	return l.sessions.ClientFor(prefix), prefix, rawWorkspace
 }
 
 func NewLifecycle(client *herdr.Client, resolver *profiles.Resolver) *Lifecycle {
@@ -98,15 +117,15 @@ func (l *Lifecycle) Start(ctx context.Context, profile profiles.Profile, request
 	startupCtx, cancel := context.WithDeadline(ctx, startupDeadline)
 	defer cancel()
 
-	inventory, err := l.herdr.GetInventory(startupCtx)
+	client, prefix, workspaceID := l.target(request)
+	inventory, err := client.GetInventory(startupCtx)
 	if err != nil {
 		return StartResult{}, err
 	}
-	workspaces, err := l.herdr.WorkspaceList(startupCtx)
+	workspaces, err := client.WorkspaceList(startupCtx)
 	if err != nil {
 		return StartResult{}, err
 	}
-	workspaceID := request.WorkspaceID
 	if workspaceID != "" && !workspaceExists(workspaces, workspaceID) {
 		return StartResult{}, errors.New("workspace is unavailable")
 	}
@@ -114,12 +133,15 @@ func (l *Lifecycle) Start(ctx context.Context, profile profiles.Profile, request
 		workspaceID = SelectWorkspaceForCwd(request.Cwd, inventory.Panes, workspaces, l.home)
 	}
 
-	target, err := l.createTarget(startupCtx, workspaceID, request.Name, request.Cwd)
+	target, err := l.createTarget(startupCtx, client, workspaceID, request.Name, request.Cwd)
 	if err != nil {
 		return StartResult{}, err
 	}
+	// Herdr answered with its own ids; the phone addresses the pane by the
+	// qualified one, and the profile memory is keyed the same way.
+	herdr.QualifyCreateResult(prefix, target)
 
-	startErr := l.startInTarget(startupCtx, profile, request.Name, target.PaneID)
+	startErr := l.startInTarget(startupCtx, client, profile, request.Name, rawID(target.PaneID))
 	if startErr != nil {
 		// The target stays open. Herdr created it, so closing it would destroy
 		// the workspace the user asked for and leave nothing to retry into. An
@@ -132,44 +154,44 @@ func (l *Lifecycle) Start(ctx context.Context, profile profiles.Profile, request
 	return StartResult{PaneID: target.PaneID, Name: request.Name, Cwd: request.Cwd, WorkspaceID: target.WorkspaceID}, nil
 }
 
-func (l *Lifecycle) createTarget(ctx context.Context, workspaceID, label, cwd string) (*herdr.CreateResult, error) {
+func (l *Lifecycle) createTarget(ctx context.Context, client *herdr.Client, workspaceID, label, cwd string) (*herdr.CreateResult, error) {
 	if workspaceID != "" {
-		return l.herdr.TabCreate(ctx, workspaceID, cwd, label)
+		return client.TabCreate(ctx, workspaceID, cwd, label)
 	}
 	workspaceLabel := filepath.Base(cwd)
 	if workspaceLabel == "." || workspaceLabel == string(filepath.Separator) || workspaceLabel == "" {
 		workspaceLabel = "workspace"
 	}
-	result, err := l.herdr.WorkspaceCreate(ctx, cwd, workspaceLabel)
+	result, err := client.WorkspaceCreate(ctx, cwd, workspaceLabel)
 	if err != nil {
 		return nil, err
 	}
 	if result.TabID == "" {
 		return result, nil
 	}
-	if err := l.herdr.TabRename(ctx, result.TabID, label); err != nil {
-		_ = l.herdr.StopPane(ctx, result.PaneID)
+	if err := client.TabRename(ctx, result.TabID, label); err != nil {
+		_ = client.StopPane(ctx, result.PaneID)
 		return nil, fmt.Errorf("label new tab: %w", err)
 	}
 	return result, nil
 }
 
-func (l *Lifecycle) startInTarget(ctx context.Context, profile profiles.Profile, name, paneID string) error {
+func (l *Lifecycle) startInTarget(ctx context.Context, client *herdr.Client, profile profiles.Profile, name, paneID string) error {
 	if profile.Kind != "" {
-		return l.startKindAgent(ctx, profile.Kind, name, paneID)
+		return l.startKindAgent(ctx, client, profile.Kind, name, paneID)
 	}
 	if len(profile.Argv) == 0 {
 		return errors.New("profile has no executable argv")
 	}
-	if err := l.herdr.PaneRun(ctx, paneID, profile.Argv); err != nil {
+	if err := client.PaneRun(ctx, paneID, profile.Argv); err != nil {
 		return err
 	}
 	ticker := time.NewTicker(customAgentPollInterval)
 	defer ticker.Stop()
 	for {
-		info, err := l.herdr.AgentGet(ctx, paneID)
+		info, err := client.AgentGet(ctx, paneID)
 		if err == nil && (info.Running || info.Status != "") {
-			return l.herdr.RenameAgent(ctx, paneID, name)
+			return client.RenameAgent(ctx, paneID, name)
 		}
 		select {
 		case <-ctx.Done():
@@ -186,10 +208,10 @@ func (l *Lifecycle) startInTarget(ctx context.Context, profile profiles.Profile,
 // start with agent_pane_busy before its own --timeout window opens, so the
 // timeout the relay passes cannot cover it. The refusal proves nothing ran,
 // which makes the retry safe.
-func (l *Lifecycle) startKindAgent(ctx context.Context, kind, name, paneID string) error {
+func (l *Lifecycle) startKindAgent(ctx context.Context, client *herdr.Client, kind, name, paneID string) error {
 	delay := agentStartRetryInitial
 	for {
-		_, err := l.herdr.StartAgent(ctx, name, kind, paneID, remainingTimeoutMS(ctx))
+		_, err := client.StartAgent(ctx, name, kind, paneID, remainingTimeoutMS(ctx))
 		if err == nil || !herdr.IsRefused(err) {
 			return err
 		}
@@ -222,7 +244,8 @@ func remainingTimeoutMS(ctx context.Context) int {
 }
 
 func (l *Lifecycle) reconcileExisting(ctx context.Context, profileID string, request StartRequest) string {
-	inventory, err := l.herdr.GetInventory(ctx)
+	client, prefix, rawWorkspace := l.target(request)
+	inventory, err := client.GetInventory(ctx)
 	if err != nil {
 		return ""
 	}
@@ -234,11 +257,12 @@ func (l *Lifecycle) reconcileExisting(ctx context.Context, profileID string, req
 		if err != nil || cwd != request.Cwd {
 			continue
 		}
-		if request.WorkspaceID != "" && pane.WorkspaceID != request.WorkspaceID {
+		if rawWorkspace != "" && pane.WorkspaceID != rawWorkspace {
 			continue
 		}
-		if l.profiles.ResolvePane(pane.ID, pane.Agent) == profileID {
-			return pane.ID
+		paneID := herdr.QualifyID(prefix, pane.ID)
+		if l.profiles.ResolvePane(paneID, pane.Agent) == profileID {
+			return paneID
 		}
 	}
 	return ""

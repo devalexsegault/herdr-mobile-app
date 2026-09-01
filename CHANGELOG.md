@@ -21,6 +21,16 @@ project follows [Semantic Versioning](https://semver.org/).
   `board_v1` only when the daemon answers, so a computer without the plugin
   shows nothing to explain away.
 
+- One relay now serves every running Herdr session on its computer. The
+  configured socket is the base session and keeps the ids it always had; the
+  others are enumerated with `herdr session list` and their workspaces, tabs
+  and panes are prefixed with the session name (`hellocare/w1:p1`), so two
+  sessions' `w1` never collide. Today groups a project by its session, the
+  workspace list labels workspaces from other sessions, and the launch form
+  asks which session a new agent should start in when there is more than one.
+  A session that stops running takes its panes with it; a command addressed
+  to it fails to connect rather than reaching a pane of the same name on
+  another session.
 - The relay reports each agent's Herdr state hook at connect. When an agent runs
   without one it can never declare a session, so no conversation exists for it;
   Settings names that once, with the exact `herdr integration install` command,

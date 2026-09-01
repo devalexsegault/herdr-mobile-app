@@ -192,6 +192,9 @@ type Workspace struct {
 	AgentStatus string             `json:"agent_status"`
 	Cwd         string             `json:"cwd,omitempty"`
 	Worktree    *WorkspaceWorktree `json:"worktree,omitempty"`
+	// Session names the Herdr session this workspace lives in; empty for the
+	// base session, whose ids are never qualified.
+	Session string `json:"session,omitempty"`
 }
 
 type WorkspaceWorktree struct {

@@ -21,6 +21,15 @@ func (d *Dispatcher) HandleWorkspaceCreate(
 	ctx context.Context,
 	requestID, cwd, label string,
 ) *CommandResult {
+	return d.HandleWorkspaceCreateIn(ctx, requestID, "", cwd, label)
+}
+
+// HandleWorkspaceCreateIn creates a workspace in a named Herdr session; the
+// empty name is the base session.
+func (d *Dispatcher) HandleWorkspaceCreateIn(
+	ctx context.Context,
+	requestID, session, cwd, label string,
+) *CommandResult {
 	const action = "workspace_create"
 	label = strings.TrimSpace(label)
 	if err := validWorkspaceLabel(label); err != nil {
@@ -38,10 +47,12 @@ func (d *Dispatcher) HandleWorkspaceCreate(
 	d.admitTopology(ctx)
 	d.topologyMu.Lock()
 	defer d.topologyMu.Unlock()
-	created, err := d.herdr.WorkspaceCreate(commandCtx, resolved, label)
+	prefix := d.sessionPrefix(session)
+	created, err := d.herdrFor(prefix).WorkspaceCreate(commandCtx, resolved, label)
 	if err != nil {
 		return d.failTopologyErr(requestID, action, "", err)
 	}
+	herdr.QualifyCreateResult(prefix, created)
 	d.topologyChanged()
 	d.recordActivity(action, "created", "Created workspace "+label, "", requestID)
 	return completed(requestID, action, "", map[string]any{
@@ -71,7 +82,7 @@ func (d *Dispatcher) HandleWorkspaceRename(
 	d.admitTopology(ctx)
 	d.topologyMu.Lock()
 	defer d.topologyMu.Unlock()
-	if err := d.herdr.WorkspaceRename(commandCtx, workspace.ID, label); err != nil {
+	if err := d.herdrFor(workspace.ID).WorkspaceRename(commandCtx, rawID(workspace.ID), label); err != nil {
 		return d.failTopologyErr(requestID, action, "", err)
 	}
 	d.topologyChanged()
@@ -97,7 +108,7 @@ func (d *Dispatcher) HandleWorkspaceReorder(
 	d.admitTopology(ctx)
 	d.topologyMu.Lock()
 	defer d.topologyMu.Unlock()
-	if err := d.herdr.WorkspaceMove(commandCtx, workspace.ID, *insertIndex); err != nil {
+	if err := d.herdrFor(workspace.ID).WorkspaceMove(commandCtx, rawID(workspace.ID), *insertIndex); err != nil {
 		return d.failTopologyErr(requestID, action, "", err)
 	}
 	d.topologyChanged()
@@ -138,7 +149,20 @@ func (d *Dispatcher) HandleWorkspaceReorderBlock(
 	d.admitTopology(ctx)
 	d.topologyMu.Lock()
 	defer d.topologyMu.Unlock()
-	if err := d.herdr.WorkspaceMoveBlock(commandCtx, workspaceIDs, beforeWorkspaceID); err != nil {
+	// A move is one Herdr call on one server, so every workspace in the block
+	// -- and the destination -- has to live in the same session.
+	prefix := prefixOf(workspaceIDs[0])
+	rawIDs := make([]string, 0, len(workspaceIDs))
+	for _, workspaceID := range workspaceIDs {
+		if prefixOf(workspaceID) != prefix {
+			return d.fail(requestID, action, "", "Workspaces from different Herdr sessions cannot be reordered together")
+		}
+		rawIDs = append(rawIDs, rawID(workspaceID))
+	}
+	if beforeWorkspaceID != "" && prefixOf(beforeWorkspaceID) != prefix {
+		return d.fail(requestID, action, "", "Workspace destination is in another Herdr session")
+	}
+	if err := d.herdrFor(workspaceIDs[0]).WorkspaceMoveBlock(commandCtx, rawIDs, rawID(beforeWorkspaceID)); err != nil {
 		return d.failTopologyErr(requestID, action, "", err)
 	}
 	d.topologyChanged()
@@ -163,7 +187,7 @@ func (d *Dispatcher) HandleWorkspaceClose(
 	d.admitTopology(ctx)
 	d.topologyMu.Lock()
 	defer d.topologyMu.Unlock()
-	if err := d.herdr.WorkspaceClose(commandCtx, workspace.ID); err != nil {
+	if err := d.herdrFor(workspace.ID).WorkspaceClose(commandCtx, rawID(workspace.ID)); err != nil {
 		return d.failTopologyErr(requestID, action, "", err)
 	}
 	d.topologyChanged()
@@ -182,10 +206,11 @@ func (d *Dispatcher) HandleWorktreeList(
 	}
 	commandCtx, cancel := context.WithTimeout(ctx, workspaceCommandDeadline)
 	defer cancel()
-	listing, err := d.herdr.WorktreeList(commandCtx, workspace.ID)
+	listing, err := d.herdrFor(workspace.ID).WorktreeList(commandCtx, rawID(workspace.ID))
 	if err != nil {
 		return d.failTopologyErr(requestID, action, "", err)
 	}
+	herdr.QualifyWorktreeListing(prefixOf(workspace.ID), listing)
 	return completed(requestID, action, "", listing)
 }
 
@@ -216,10 +241,11 @@ func (d *Dispatcher) HandleWorktreeCreate(
 	d.admitTopology(ctx)
 	d.topologyMu.Lock()
 	defer d.topologyMu.Unlock()
-	created, err := d.herdr.WorktreeCreate(commandCtx, workspace.ID, branch, base, label)
+	created, err := d.herdrFor(workspace.ID).WorktreeCreate(commandCtx, rawID(workspace.ID), branch, base, label)
 	if err != nil {
 		return d.failTopologyErr(requestID, action, "", err)
 	}
+	herdr.QualifyWorktreeMutation(prefixOf(workspace.ID), created)
 	d.topologyChanged()
 	d.recordActivity(action, "created", "Created worktree "+branch, "", requestID)
 	return completed(requestID, action, "", created)
@@ -248,10 +274,11 @@ func (d *Dispatcher) HandleWorktreeOpen(
 	d.admitTopology(ctx)
 	d.topologyMu.Lock()
 	defer d.topologyMu.Unlock()
-	opened, err := d.herdr.WorktreeOpen(commandCtx, workspace.ID, path, branch, label)
+	opened, err := d.herdrFor(workspace.ID).WorktreeOpen(commandCtx, rawID(workspace.ID), path, branch, label)
 	if err != nil {
 		return d.failTopologyErr(requestID, action, "", err)
 	}
+	herdr.QualifyWorktreeMutation(prefixOf(workspace.ID), opened)
 	d.topologyChanged()
 	d.recordActivity(action, "opened", "Opened worktree "+opened.Worktree.Label, "", requestID)
 	return completed(requestID, action, "", opened)
@@ -275,9 +302,12 @@ func (d *Dispatcher) HandleWorktreeRemove(
 	d.admitTopology(ctx)
 	d.topologyMu.Lock()
 	defer d.topologyMu.Unlock()
-	removed, err := d.herdr.WorktreeRemove(commandCtx, workspace.ID, force)
+	removed, err := d.herdrFor(workspace.ID).WorktreeRemove(commandCtx, rawID(workspace.ID), force)
 	if err != nil {
 		return d.failTopologyErr(requestID, action, "", err)
+	}
+	if removed != nil {
+		removed.WorkspaceID = herdr.QualifyID(prefixOf(workspace.ID), removed.WorkspaceID)
 	}
 	d.topologyChanged()
 	d.recordActivity(action, "removed", "Removed worktree "+workspace.Label, "", requestID)

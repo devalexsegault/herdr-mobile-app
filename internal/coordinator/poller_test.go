@@ -44,12 +44,12 @@ func TestPollerIntervalTracksEventStreamHealth(t *testing.T) {
 		t.Fatalf("interval with events down = %v, want the configured 1s", got)
 	}
 
-	poller.eventsActive.Store(true)
+	poller.eventStreams.Store(1)
 	if got := poller.currentInterval(); got != idlePollInterval {
 		t.Fatalf("interval with events up = %v, want %v", got, idlePollInterval)
 	}
 
-	poller.eventsActive.Store(false)
+	poller.eventStreams.Store(0)
 	if got := poller.currentInterval(); got != time.Second {
 		t.Fatalf("interval after events dropped = %v, want the configured 1s", got)
 	}

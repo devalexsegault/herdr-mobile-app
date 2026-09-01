@@ -42,6 +42,7 @@ import {
 import type {
   Activity,
   AgentIntegration,
+  HerdrSessionInfo,
   Agent,
   AgentProfile,
   AgentInventoryStatus,
@@ -185,6 +186,7 @@ function normalizeWorkspace(
     pane_count: Number(value.pane_count) || 0,
     tab_count: Number(value.tab_count) || 0,
     active_tab_id: String(value.active_tab_id || ''),
+    session: String(value.session || ''),
     agent_status: String(value.agent_status || ''),
     cwd: String(value.cwd || ''),
     worktree: worktreeValue ? {
@@ -423,6 +425,7 @@ class RelayStore {
       agentProfiles: [],
       capabilities: [],
       integrations: [],
+      sessions: [],
       directoryBrowser: null,
       directoryLoading: false,
       directoryError: '',
@@ -815,6 +818,11 @@ class RelayStore {
         ? message.board as BoardDescriptor
         : undefined;
       if (connection.board) this.sendRaw(relayId, { type: 'board_subscribe' });
+      connection.sessions = Array.isArray(message.sessions)
+        ? (message.sessions as HerdrSessionInfo[]).filter(
+          (entry) => entry && typeof entry.name === 'string' && entry.name !== '',
+        )
+        : [];
       connection.integrations = Array.isArray(message.integrations)
         ? (message.integrations as AgentIntegration[]).filter(
           (entry) => entry && typeof entry.agent === 'string' && entry.agent !== '',

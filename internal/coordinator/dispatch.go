@@ -39,6 +39,7 @@ type CommandResult struct {
 
 type Dispatcher struct {
 	herdr            *herdr.Client
+	sessions         *herdr.Sessions
 	state            *State
 	journal          *activity.Journal
 	activityW        *activity.Worker
@@ -106,6 +107,49 @@ func NewDispatcher(client *herdr.Client, state *State, journal *activity.Journal
 func (d *Dispatcher) SetProfiles(resolver *profiles.Resolver) {
 	d.profiles = resolver
 	d.lifecycle = NewLifecycle(d.herdr, resolver)
+	d.lifecycle.sessions = d.sessions
+}
+
+// SetSessions installs the session overlay. Without it every id is a raw
+// Herdr id on the one configured client, which is exactly how the relay
+// behaved before sessions existed.
+func (d *Dispatcher) SetSessions(sessions *herdr.Sessions) {
+	d.sessions = sessions
+	if d.lifecycle != nil {
+		d.lifecycle.sessions = sessions
+	}
+}
+
+// herdrFor returns the Herdr client that owns a possibly session-qualified
+// id. A session that stopped running answers with a client that cannot
+// connect, never with the base client: the raw id exists there too, on a
+// different pane.
+func (d *Dispatcher) herdrFor(id string) *herdr.Client {
+	if d.sessions == nil {
+		return d.herdr
+	}
+	prefix, _ := herdr.SplitID(id)
+	return d.sessions.ClientFor(prefix)
+}
+
+// prefixOf is the session prefix carried by an id: empty for the base session.
+func prefixOf(id string) string {
+	prefix, _ := herdr.SplitID(id)
+	return prefix
+}
+
+// rawID is the id Herdr itself understands.
+func rawID(id string) string {
+	_, raw := herdr.SplitID(id)
+	return raw
+}
+
+// sessionPrefix resolves a session name a request named to its id prefix.
+func (d *Dispatcher) sessionPrefix(session string) string {
+	if d.sessions == nil {
+		return ""
+	}
+	return d.sessions.Prefix(session)
 }
 
 func (d *Dispatcher) CancelInflight() {
@@ -363,19 +407,19 @@ func (d *Dispatcher) handlePrompt(ctx context.Context, receivedAt time.Time, req
 			return EffectResult{Result: stale}
 		}
 		if !requiresEnter {
-			if err := d.herdr.Prompt(effectCtx, paneID, text); err != nil {
+			if err := d.herdrFor(paneID).Prompt(effectCtx, rawID(paneID), text); err != nil {
 				return EffectResult{Result: d.failErr(requestID, "prompt", paneID, err)}
 			}
 			return EffectResult{Result: completed(requestID, "prompt", paneID, nil)}
 		}
-		if err := d.herdr.SendText(effectCtx, paneID, text); err != nil {
+		if err := d.herdrFor(paneID).SendText(effectCtx, rawID(paneID), text); err != nil {
 			return EffectResult{Result: d.failErr(requestID, "prompt", paneID, err)}
 		}
 		if err := d.paneSessionError(token); err != nil {
 			err = partiallyApplied("prompt text was already delivered", err)
 			return EffectResult{Result: d.failErr(requestID, "prompt", paneID, err)}
 		}
-		if err := d.herdr.SendKeys(effectCtx, paneID, []string{"Enter"}); err != nil {
+		if err := d.herdrFor(paneID).SendKeys(effectCtx, rawID(paneID), []string{"Enter"}); err != nil {
 			err = partiallyApplied("prompt text was already delivered", err)
 			return EffectResult{Result: d.failErr(requestID, "prompt", paneID, err)}
 		}
@@ -399,7 +443,7 @@ func (d *Dispatcher) handleKeys(ctx context.Context, receivedAt time.Time, reque
 		if stale := d.paneSessionCurrent(token, requestID, "keys"); stale != nil {
 			return EffectResult{Result: stale}
 		}
-		if err := d.herdr.SendKeys(effectCtx, paneID, keys); err != nil {
+		if err := d.herdrFor(paneID).SendKeys(effectCtx, rawID(paneID), keys); err != nil {
 			return EffectResult{Result: d.failErr(requestID, "keys", paneID, err)}
 		}
 		return EffectResult{Result: completed(requestID, "keys", paneID, nil)}
@@ -426,7 +470,7 @@ func (d *Dispatcher) handleText(ctx context.Context, receivedAt time.Time, reque
 		if stale := d.paneSessionCurrent(token, requestID, "text"); stale != nil {
 			return EffectResult{Result: stale}
 		}
-		if err := d.herdr.SendText(effectCtx, paneID, text); err != nil {
+		if err := d.herdrFor(paneID).SendText(effectCtx, rawID(paneID), text); err != nil {
 			return EffectResult{Result: d.failErr(requestID, "text", paneID, err)}
 		}
 		return EffectResult{Result: completed(requestID, "text", paneID, nil)}
@@ -469,7 +513,7 @@ func (d *Dispatcher) handleSecret(ctx context.Context, receivedAt time.Time, req
 		if stale := d.paneSessionCurrent(token, requestID, "send_secret"); stale != nil {
 			return EffectResult{Result: stale}
 		}
-		if err := d.herdr.SendKeys(effectCtx, paneID, keys); err != nil {
+		if err := d.herdrFor(paneID).SendKeys(effectCtx, rawID(paneID), keys); err != nil {
 			return EffectResult{Result: d.failErr(requestID, "send_secret", paneID, err)}
 		}
 		return EffectResult{Result: completed(requestID, "send_secret", paneID, nil)}
@@ -495,7 +539,7 @@ func (d *Dispatcher) handleStop(ctx context.Context, receivedAt time.Time, reque
 		if stale := d.paneSessionCurrent(token, requestID, "agent_stop"); stale != nil {
 			return EffectResult{Result: stale}
 		}
-		if err := d.herdr.StopPane(effectCtx, paneID); err != nil {
+		if err := d.herdrFor(paneID).StopPane(effectCtx, rawID(paneID)); err != nil {
 			return EffectResult{Result: d.failErr(requestID, "agent_stop", paneID, err)}
 		}
 		return EffectResult{Result: completed(requestID, "agent_stop", paneID, nil), BumpGeneration: true}
@@ -530,7 +574,7 @@ func (d *Dispatcher) handleTabRename(ctx context.Context, receivedAt time.Time, 
 		if stale := d.paneSessionCurrent(token, requestID, "agent_rename"); stale != nil {
 			return EffectResult{Result: stale}
 		}
-		if err := d.herdr.TabRename(effectCtx, agent.TabID, label); err != nil {
+		if err := d.herdrFor(agent.TabID).TabRename(effectCtx, rawID(agent.TabID), label); err != nil {
 			return EffectResult{Result: d.failErr(requestID, "agent_rename", paneID, err)}
 		}
 		return EffectResult{Result: completed(requestID, "agent_rename", paneID, nil)}
@@ -560,7 +604,7 @@ func (d *Dispatcher) handleTabReorder(ctx context.Context, receivedAt time.Time,
 		if stale := d.paneSessionCurrent(token, requestID, "tab_reorder"); stale != nil {
 			return EffectResult{Result: stale}
 		}
-		if err := d.herdr.TabMove(effectCtx, agent.TabID, insertIndex); err != nil {
+		if err := d.herdrFor(agent.TabID).TabMove(effectCtx, rawID(agent.TabID), insertIndex); err != nil {
 			return EffectResult{Result: d.failErr(requestID, "tab_reorder", paneID, err)}
 		}
 		return EffectResult{Result: completed(
@@ -603,6 +647,7 @@ func (d *Dispatcher) handleAgentStart(ctx context.Context, receivedAt time.Time,
 		Name:        stringValue(message, "name"),
 		Cwd:         stringValue(message, "cwd"),
 		Prompt:      stringValue(message, "prompt"),
+		Session:     stringValue(message, "herdr_session"),
 	}
 	if request.ProfileID == "" || request.Name == "" || request.Cwd == "" {
 		return d.fail(requestID, "agent_start", "", "Profile, name, and working directory are required")
@@ -704,7 +749,7 @@ func (d *Dispatcher) handleClear(ctx context.Context, receivedAt time.Time, requ
 			if stale := d.paneSessionCurrent(token, requestID, "agent_clear"); stale != nil {
 				return EffectResult{Result: stale}
 			}
-			if err := d.herdr.StopPane(effectCtx, paneID); err != nil {
+			if err := d.herdrFor(paneID).StopPane(effectCtx, rawID(paneID)); err != nil {
 				return EffectResult{Result: d.failErr(requestID, "agent_clear", paneID, err)}
 			}
 			return EffectResult{Result: completed(requestID, "agent_clear", paneID, nil), BumpGeneration: true}
@@ -717,7 +762,8 @@ func (d *Dispatcher) handleClear(ctx context.Context, receivedAt time.Time, requ
 		return d.fail(requestID, "agent_clear", paneID, "This agent does not match an available launch profile")
 	}
 	name := "clear-" + fmt.Sprintf("%x", receivedAt.UnixNano())[:8]
-	request := StartRequest{ProfileID: profile.ID, Name: name, Cwd: agent.Cwd}
+	// The replacement lands in the session the cleared agent lived in.
+	request := StartRequest{ProfileID: profile.ID, Name: name, Cwd: agent.Cwd, Session: agent.HerdrSession}
 	_, request, err := d.lifecycle.ValidateStart(request)
 	if err != nil {
 		return d.fail(requestID, "agent_clear", paneID, err.Error())
@@ -738,7 +784,7 @@ func (d *Dispatcher) handleClear(ctx context.Context, receivedAt time.Time, requ
 		if stale := d.paneSessionCurrent(token, requestID, "agent_clear"); stale != nil {
 			return EffectResult{Result: stale}
 		}
-		if err := d.herdr.StopPane(effectCtx, paneID); err != nil {
+		if err := d.herdrFor(paneID).StopPane(effectCtx, rawID(paneID)); err != nil {
 			data["warning"] = "Replacement started, but the old pane could not be closed"
 			result := completed(requestID, "agent_clear", paneID, data)
 			result.Phase = "completed_with_warning"
@@ -1042,14 +1088,14 @@ func (d *Dispatcher) readPaneForDisplay(
 	// viewport holds makes Herdr scroll the operator's real pane up and snap
 	// it back, once per read. Only "visible" cannot trigger the harvest.
 	if format != "ansi" {
-		return d.herdr.ReadPaneVisible(ctx, paneID, lines, format)
+		return d.herdrFor(paneID).ReadPaneVisible(ctx, rawID(paneID), lines, format)
 	}
 	if !resized {
 		if agent, ok := d.state.Agent(paneID); ok && isClaudeAgent(agent.Agent) {
-			return d.herdr.ReadPane(ctx, paneID, lines, format)
+			return d.herdrFor(paneID).ReadPane(ctx, rawID(paneID), lines, format)
 		}
 	}
-	return d.herdr.ReadPaneRecent(ctx, paneID, lines, format)
+	return d.herdrFor(paneID).ReadPaneRecent(ctx, rawID(paneID), lines, format)
 }
 
 func (d *Dispatcher) HandleReadPane(ctx context.Context, message map[string]any) map[string]any {
@@ -1135,7 +1181,7 @@ func (d *Dispatcher) HandleProbePane(ctx context.Context, message map[string]any
 	defer cancel()
 	generation := d.state.Generation(paneID)
 	contentRevision := d.state.ContentRevision(paneID)
-	content, err := d.herdr.ProbePaneVisible(readCtx, paneID, lines, format)
+	content, err := d.herdrFor(paneID).ProbePaneVisible(readCtx, rawID(paneID), lines, format)
 	if err != nil {
 		return map[string]any{"type": "pane_probe", "pane_id": paneID, "format": format, "error": "Unable to read the agent pane"}
 	}

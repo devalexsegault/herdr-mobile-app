@@ -23,7 +23,7 @@ func TestCustomAgentTimeoutAfterPaneRunIsDispatchedUnknown(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
 
-	err := lifecycle.startInTarget(ctx, profiles.Profile{Argv: []string{"custom-agent"}}, "agent", "pane-1")
+	err := lifecycle.startInTarget(ctx, lifecycle.herdr, profiles.Profile{Argv: []string{"custom-agent"}}, "agent", "pane-1")
 	if !errors.Is(err, herdr.ErrDispatchedUnknown) {
 		t.Fatalf("custom agent timeout = %v, want dispatched_unknown", err)
 	}

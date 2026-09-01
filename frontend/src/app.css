@@ -364,7 +364,7 @@ textarea { min-height: 6.5rem; resize: vertical; }
 .directory-list p { color: var(--muted); font-size: .75rem; margin: 0; padding: .8rem; }
 
 .activity-toolbar { align-items: center; display: flex; gap: .75rem; justify-content: flex-end; margin-bottom: .6rem; }
-.activity-toolbar :global(.button-ghost) { color: var(--muted); }
+.activity-toolbar .button-ghost { color: var(--muted); }
 .activity-toolbar h2 { margin: 0; }
 .activity-search { margin-bottom: .8rem; }
 .activity-summary { background: var(--card); border: 1px solid var(--border); border-radius: .9rem; margin-bottom: .9rem; overflow: hidden; }
@@ -1151,7 +1151,7 @@ textarea { min-height: 6.5rem; resize: vertical; }
   -webkit-line-clamp: 3;
 }
 .waiting-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
-.waiting-actions :global(.button) { flex: 1 1 8rem; }
+.waiting-actions .button { flex: 1 1 8rem; }
 
 .project-chip { background: var(--secondary); border-radius: .4rem; color: var(--muted); font-size: .68rem; overflow: hidden; padding: .12rem .4rem; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -1165,7 +1165,7 @@ textarea { min-height: 6.5rem; resize: vertical; }
 .agent-row:disabled { cursor: not-allowed; opacity: .5; }
 .agent-row-copy { display: flex; flex: 1; flex-direction: column; gap: .1rem; min-width: 0; }
 .agent-row-title { align-items: center; display: flex; font-size: .84rem; font-weight: 550; gap: .35rem; }
-.agent-row-title :global(img), .agent-row-title :global(svg) { height: .95rem; width: .95rem; }
+.agent-row-title img, .agent-row-title svg { height: .95rem; width: .95rem; }
 .agent-row-meta { color: var(--muted); font-size: .71rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agent-row-age { color: var(--muted); font-size: .69rem; }
 .home-browse { align-items: center; background: transparent; border: 1px solid var(--border); border-radius: .8rem; color: var(--muted); cursor: pointer; display: flex; font-family: inherit; font-size: .8rem; font-weight: 600; gap: .4rem; justify-content: center; min-height: 2.75rem; padding: .6rem; width: 100%; }
@@ -1177,7 +1177,7 @@ textarea { min-height: 6.5rem; resize: vertical; }
 .conversation-answer { border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: .6rem; padding: .75rem .85rem; }
 .conversation-answer-prompt { color: var(--foreground); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .75rem; line-height: 1.45; margin: 0; overflow-wrap: anywhere; }
 .conversation-answer-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
-.conversation-answer-actions :global(.button) { flex: 1 1 8rem; }
+.conversation-answer-actions .button { flex: 1 1 8rem; }
 
 /* Chat and Terminal are two views of one agent, so they read as one control
    rather than two icons that look like separate destinations. */
@@ -1245,7 +1245,7 @@ textarea { min-height: 6.5rem; resize: vertical; }
 .card-chips { align-items: center; display: flex; flex-wrap: wrap; gap: .4rem; }
 .card-status { font-size: .76rem; font-weight: 600; }
 .card-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
-.card-actions :global(.button) { flex: 1 1 8rem; }
+.card-actions .button { flex: 1 1 8rem; }
 .card-section { display: flex; flex-direction: column; gap: .5rem; }
 .card-section h3 { color: var(--muted); font-size: .72rem; font-weight: 650; letter-spacing: .04em; margin: 0; text-transform: uppercase; }
 .card-columns { display: flex; flex-wrap: wrap; gap: .4rem; }
@@ -1257,13 +1257,17 @@ textarea { min-height: 6.5rem; resize: vertical; }
 
 /* Chat surface: the send control is a filled circle, the attach control stays
    quiet, and both keep the 44 px target. */
-.conversation-composer :global(.button-icon), .conversation-composer .button-icon { border-radius: 999px; }
+.conversation-composer .button-icon { border-radius: 999px; }
 .conversation-composer button[type='submit'] { border-radius: 999px; }
 .relay-remove { color: var(--danger); }
 
 .workspace-scope { align-items: flex-end; display: flex; gap: .6rem; margin-bottom: 1rem; }
 .workspace-scope-field { display: flex; flex: 1; flex-direction: column; gap: .35rem; min-width: 0; }
 .workspace-scope-field label { color: var(--muted); font-size: .72rem; font-weight: 650; letter-spacing: .03em; text-transform: uppercase; }
-.workspace-scope :global(.workspace-create-button) { flex: 0 0 auto; white-space: nowrap; }
+.workspace-scope .workspace-create-button { flex: 0 0 auto; white-space: nowrap; width: auto; }
 .integration-hint { border-left: 3px solid var(--warning); margin-top: .6rem; padding-left: .6rem; }
 .integration-hint code { background: var(--secondary); border-radius: .3rem; font-size: .92em; padding: .05rem .3rem; }
+
+/* A workspace that lives in another Herdr session says so next to its name;
+   the base session needs no label, it is where everything was before. */
+.session-chip { align-self: flex-start; background: color-mix(in srgb, var(--trust) 16%, var(--card)); border: 1px solid color-mix(in srgb, var(--trust) 40%, var(--border)); border-radius: .4rem; color: var(--trust); font-size: .64rem; font-weight: 650; margin-left: .4rem; padding: .08rem .4rem; vertical-align: middle; }

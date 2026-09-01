@@ -567,6 +567,7 @@
       <header>
         <span>
           <strong>{workspace.label}</strong>
+          {#if workspace.session}<span class="session-chip">{workspace.session}</span>{/if}
           {#if shownPath}<small>{shownPath}</small>{/if}
         </span>
         {#if tree}

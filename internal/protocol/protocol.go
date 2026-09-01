@@ -56,13 +56,17 @@ var mutatingTypes = map[string]bool{
 }
 
 type Inbound struct {
-	Type              string          `json:"type"`
-	Protocol          int             `json:"protocol"`
-	RequestID         string          `json:"request_id,omitempty"`
-	PaneID            string          `json:"pane_id,omitempty"`
-	Text              string          `json:"text,omitempty"`
-	Name              string          `json:"name,omitempty"`
-	ProfileID         string          `json:"profile_id,omitempty"`
+	Type      string `json:"type"`
+	Protocol  int    `json:"protocol"`
+	RequestID string `json:"request_id,omitempty"`
+	PaneID    string `json:"pane_id,omitempty"`
+	Text      string `json:"text,omitempty"`
+	Name      string `json:"name,omitempty"`
+	ProfileID string `json:"profile_id,omitempty"`
+	// HerdrSession names the Herdr session a start or a workspace creation
+	// targets. Empty means the base session; ids the phone already holds carry
+	// their session and need no hint.
+	HerdrSession      string          `json:"herdr_session,omitempty"`
 	Label             string          `json:"label,omitempty"`
 	WorkspaceID       string          `json:"workspace_id,omitempty"`
 	WorkspaceIDs      []string        `json:"workspace_ids,omitempty"`
@@ -220,6 +224,9 @@ type PushConfig struct {
 	// the app never has to make a second round trip to find out whether the
 	// board it is about to show can actually dispatch agents.
 	Board map[string]any `json:"board,omitempty"`
+	// Sessions lists the Herdr sessions this relay serves, base first, so the
+	// phone can offer where a new agent or workspace should go.
+	Sessions any `json:"sessions,omitempty"`
 	// Integrations reports each agent's Herdr state hook. An agent whose hook is
 	// missing never declares a session, so the relay cannot reconstruct its
 	// conversation: the app says that once, here, instead of leaving a dead

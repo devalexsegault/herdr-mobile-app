@@ -16,21 +16,24 @@ import (
 )
 
 type AgentState struct {
-	PaneID                       string                 `json:"pane_id"`
-	RawPaneID                    string                 `json:"raw_pane_id"`
-	TerminalID                   string                 `json:"terminal_id"`
-	TabID                        string                 `json:"tab_id"`
-	TabLabel                     string                 `json:"tab_label"`
-	TabNumber                    int                    `json:"tab_number"`
-	TabOrder                     int                    `json:"tab_order,omitempty"`
-	WorkspaceID                  string                 `json:"workspace_id"`
-	Agent                        string                 `json:"agent"`
-	Name                         string                 `json:"name"`
-	Status                       string                 `json:"status"`
-	Focused                      bool                   `json:"_focused"`
-	Cwd                          string                 `json:"cwd"`
-	Project                      string                 `json:"project"`
-	Host                         string                 `json:"host"`
+	PaneID      string `json:"pane_id"`
+	RawPaneID   string `json:"raw_pane_id"`
+	TerminalID  string `json:"terminal_id"`
+	TabID       string `json:"tab_id"`
+	TabLabel    string `json:"tab_label"`
+	TabNumber   int    `json:"tab_number"`
+	TabOrder    int    `json:"tab_order,omitempty"`
+	WorkspaceID string `json:"workspace_id"`
+	Agent       string `json:"agent"`
+	Name        string `json:"name"`
+	Status      string `json:"status"`
+	Focused     bool   `json:"_focused"`
+	Cwd         string `json:"cwd"`
+	Project     string `json:"project"`
+	Host        string `json:"host"`
+	// HerdrSession names the Herdr session the pane lives in; empty for the
+	// base session. Session, below, is the agent's own conversation session.
+	HerdrSession                 string                 `json:"herdr_session,omitempty"`
 	Session                      string                 `json:"session"`
 	SessionName                  string                 `json:"session_name"`
 	UpdatedAt                    int64                  `json:"updated_at"`

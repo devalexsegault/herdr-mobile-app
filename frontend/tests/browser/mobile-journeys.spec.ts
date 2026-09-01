@@ -5564,3 +5564,41 @@ test('names the missing agent integration once, in settings', async ({ page }) =
   await expect(hint).not.toContainText('pi');
   await expect(hint).not.toContainText('claude');
 });
+
+test('keeps two Herdr sessions apart and names the second one', async ({ page }) => {
+  await boot(page, [fedora]);
+  await expect.poll(() => socketCount(page)).toBe(1);
+  await handshake(page, 0, {
+    capabilities: ['attention_classification', 'workspace_management'],
+    sessions: [
+      { name: 'default', prefix: '', default: true },
+      { name: 'hellocare', prefix: 'hellocare', default: false },
+    ],
+  });
+  await server(page, 0, {
+    type: 'workspaces',
+    workspaces: [
+      { workspace_id: 'w1', number: 1, label: 'front', pane_count: 1, tab_count: 1, cwd: '/work/front' },
+      { workspace_id: 'hellocare/w1', number: 1, label: 'front', pane_count: 1, tab_count: 1, cwd: '/work/hello/front', session: 'hellocare' },
+    ],
+  });
+  await server(page, 0, {
+    type: 'agents',
+    agents: [
+      { pane_id: 'w1:p1', workspace_id: 'w1', status: 'working', project: 'front', agent: 'claude' },
+      { pane_id: 'hellocare/w1:p1', workspace_id: 'hellocare/w1', status: 'working', project: 'front', agent: 'codex', herdr_session: 'hellocare' },
+    ],
+  });
+
+  // Two projects called `front`, one per session, stay two groups on Today.
+  await expect(page.locator('.project-group-name')).toHaveText(['front', 'hellocare · front']);
+
+  // The workspace from the other session says where it lives.
+  await page.getByRole('button', { name: 'Manage workspaces' }).click();
+  await expect(page.locator('.session-chip')).toHaveText(['hellocare']);
+
+  // Starting an agent asks which session it should go to.
+  await page.getByRole('button', { name: 'Back' }).click();
+  await page.locator('.home-fab').click();
+  await expect(page.locator('#launch-session option')).toHaveText(['default (default)', 'hellocare']);
+});

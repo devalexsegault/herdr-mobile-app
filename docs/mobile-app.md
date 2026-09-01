@@ -73,6 +73,24 @@ the missing ones — only the agents actually running on that computer — with 
 command to fix it. Agents started before the hook was installed keep no
 transcript; restart them to record one.
 
+## Several Herdr sessions on one computer
+
+A relay serves every Herdr session running on its computer, not only the
+socket it was configured with. That socket is the *base* session: its
+workspaces, tabs and panes keep the ids Herdr gives them. Every other running
+session — found through `herdr session list` — has its ids prefixed with the
+session name, `hellocare/w1:p1`, because each session numbers from one and two
+`w1`s would otherwise collide. The prefix is the whole difference: an agent in
+another session is opened, prompted, approved and stopped exactly like one in
+the base session, with the relay routing each command to the socket that owns
+the pane.
+
+Today groups a project by its session (`hellocare · front`), the workspace list
+labels workspaces from other sessions, and Start Agent asks which session a
+new agent belongs to when there is more than one. A session that stops running
+takes its panes out of the list; a command addressed to a pane of a stopped
+session fails rather than reaching a pane of the same name somewhere else.
+
 ## The board
 
 When the relay reports a running [herdr-board](https://github.com/nelsonPires5/herdr-board)

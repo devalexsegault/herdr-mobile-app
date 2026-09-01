@@ -22,6 +22,9 @@
 
   let relayId = $state('');
   let profileId = $state('');
+  // Which Herdr session a fresh workspace lands in. A chosen workspace
+  // already carries its session, so this only matters without one.
+  let sessionName = $state('');
   let cwd = $state('');
   let name = $state('');
   let prompt = $state('');
@@ -49,6 +52,7 @@
   }));
   const connection = $derived($connections.get(relayId));
   const profiles = $derived(connection?.agentProfiles || []);
+  const sessions = $derived(connection?.sessions || []);
   const targetWorkspace = $derived(
     $workspaces.find((workspace) => (
       workspace.relay_id === relayId && workspace.workspace_id === workspaceId
@@ -66,6 +70,7 @@
         : connectedRelays[0]?.id || '';
     }
     if (!profiles.some((profile) => profile.id === profileId)) profileId = profiles[0]?.id || '';
+    if (!sessions.some((session) => session.name === sessionName)) sessionName = sessions[0]?.name || '';
     if (relayId && relayId !== loadedRelay) {
       loadedRelay = relayId;
       directoryRelayId = '';
@@ -119,6 +124,7 @@
         cwd: launchCwd,
         prompt,
         workspace_id: targetWorkspace?.workspace_id || '',
+        herdr_session: targetWorkspace ? '' : sessionName,
       }, 45_000);
       const warning = String(result.data?.warning || '');
       status = warning || 'Agent started.';
@@ -162,6 +168,14 @@
         <p class="hint">New tab in workspace <strong>{targetWorkspace.label}</strong>. The desktop keeps its current focus.</p>
       {/if}
 
+      {#if sessions.length > 1 && !targetWorkspace}
+        <label for="launch-session">Session</label>
+        <select id="launch-session" bind:value={sessionName}>
+          {#each sessions as session (session.name)}
+            <option value={session.name}>{session.name}{session.default ? ' (default)' : ''}</option>
+          {/each}
+        </select>
+      {/if}
       <label for="launch-profile">Agent</label>
       <select id="launch-profile" bind:value={profileId} onchange={updateName} required>
         {#if !profiles.length}<option value="">No agent profiles available</option>{/if}

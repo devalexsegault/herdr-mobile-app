@@ -90,7 +90,7 @@ func (d *Dispatcher) handleApproval(ctx context.Context, receivedAt time.Time, r
 			len(current.Options) != payload.Total {
 			return EffectResult{Result: d.fail(requestID, "approval", paneID, "This approval request is no longer current")}
 		}
-		read, err := d.herdr.ReadPane(effectCtx, paneID, 80, "ansi")
+		read, err := d.herdrFor(paneID).ReadPane(effectCtx, rawID(paneID), 80, "ansi")
 		if err != nil {
 			return EffectResult{Result: d.failErr(requestID, "approval", paneID, err)}
 		}
@@ -103,9 +103,9 @@ func (d *Dispatcher) handleApproval(ctx context.Context, receivedAt time.Time, r
 		if stale := d.paneSessionCurrent(token, requestID, "approval"); stale != nil {
 			return EffectResult{Result: stale}
 		}
-		if err := d.herdr.SendKeys(
+		if err := d.herdrFor(paneID).SendKeys(
 			effectCtx,
-			paneID,
+			rawID(paneID),
 			approvalKeys(payload.Index, classification.ApprovalFocus),
 		); err != nil {
 			return EffectResult{Result: d.failErr(requestID, "approval", paneID, err)}
@@ -306,7 +306,7 @@ func (d *Dispatcher) submitQuestion(ctx context.Context, receivedAt time.Time, r
 		if !ok || (current.Status != "blocked" && current.Status != "done") {
 			return EffectResult{Result: d.fail(requestID, action, paneID, "The question changed before the answer was applied")}
 		}
-		read, err := d.herdr.ReadPane(effectCtx, paneID, 80, "ansi")
+		read, err := d.herdrFor(paneID).ReadPane(effectCtx, rawID(paneID), 80, "ansi")
 		if err != nil {
 			return EffectResult{Result: d.failErr(requestID, action, paneID, err)}
 		}
@@ -411,7 +411,7 @@ func (d *Dispatcher) executeQuestion(
 		if err := d.paneSessionError(token); err != nil {
 			return err
 		}
-		err := d.herdr.SendText(ctx, paneID, s)
+		err := d.herdrFor(paneID).SendText(ctx, rawID(paneID), s)
 		if err == nil {
 			dispatched = true
 			return nil
@@ -465,7 +465,7 @@ func (d *Dispatcher) sendQuestionKeysForSession(ctx context.Context, token Worke
 			}
 			return err
 		}
-		if err := d.herdr.SendKeys(ctx, paneID, []string{key}); err != nil {
+		if err := d.herdrFor(paneID).SendKeys(ctx, rawID(paneID), []string{key}); err != nil {
 			if index > 0 {
 				return partiallyApplied("question input was only partially applied", err)
 			}
@@ -523,7 +523,7 @@ func (d *Dispatcher) watchQuestion(
 				d.finishQuestionWatch(ledgerKey, generation, requestID, action, paneID, original, navigation, nil)
 				return
 			}
-			read, err := d.herdr.ReadPane(ctx, paneID, 80, "ansi")
+			read, err := d.herdrFor(paneID).ReadPane(ctx, rawID(paneID), 80, "ansi")
 			if err != nil {
 				continue
 			}

@@ -86,6 +86,7 @@ type Server struct {
 	profiles         *profiles.Resolver
 	webH             *web.Handler
 	herdrC           *herdr.Client
+	herdrSessions    *herdr.Sessions
 	clipboardRead    func(context.Context) ([]byte, error)
 	clipboardWrite   func(context.Context, []byte) error
 	copyRunner       copyResponseRunner
@@ -130,9 +131,13 @@ func New(cfg *config.Config, version, revision string, logger *slog.Logger) *Ser
 	state := coordinator.NewState(logger)
 	hub := transport.NewHub(cfg, logger)
 	herdrClient := herdr.NewClient(cfg.HerdrBin, cfg.SocketPath)
+	// Every running Herdr session on this computer is served by this one
+	// relay; the configured socket is the base session and keeps raw ids.
+	herdrSessions := herdr.NewSessions(cfg.HerdrBin, herdrClient)
 	_, clipboardRead, _ := clipboard.Reader()
 	pollInterval := time.Duration(cfg.PollInterval * float64(time.Second))
 	poller := coordinator.NewPoller(herdrClient, state, pollInterval, logger)
+	poller.SetSessions(herdrSessions)
 
 	home, _ := os.UserHomeDir()
 	hostname, _ := os.Hostname()
@@ -161,7 +166,8 @@ func New(cfg *config.Config, version, revision string, logger *slog.Logger) *Ser
 		clipboardWrite:      clipboard.Write,
 		copyRunner:          copyresponse.Run,
 		herdrC:              herdrClient,
-		paneSizeM:           panesize.NewManager(herdrClient, logger),
+		herdrSessions:       herdrSessions,
+		paneSizeM:           panesize.NewManager(sessionPanes{sessions: herdrSessions}, logger),
 		profiles:            profResolver,
 		sessions:            sessResolver,
 		historyM:            histManager,
@@ -250,6 +256,7 @@ func (s *Server) Run(ctx context.Context) error {
 	})
 
 	s.dispatcher = coordinator.NewDispatcher(s.herdrC, s.state, s.journal, s.logger)
+	s.dispatcher.SetSessions(s.herdrSessions)
 	s.dispatcher.SetProfiles(s.profiles)
 	s.dispatcher.SetBroadcast(s.broadcastCommitted)
 	s.dispatcher.SetWakePoll(func() { s.poller.Wake() })
@@ -300,6 +307,7 @@ func (s *Server) Run(ctx context.Context) error {
 			Capabilities:   capabilities,
 			Inventory:      inventory,
 			Board:          boardDescriptor,
+			Sessions:       s.sessionDescriptors(),
 			Integrations:   integrations,
 			AgentProfiles:  s.profiles.Profiles(),
 			Hybrid:         s.hybridDescriptor(),
@@ -525,7 +533,7 @@ func (s *Server) Run(ctx context.Context) error {
 			result := s.dispatcher.HandleTopologyAdmitted(commandCtx, admitted, func(handlerCtx context.Context) *coordinator.CommandResult {
 				switch action {
 				case "workspace_create":
-					return s.dispatcher.HandleWorkspaceCreate(handlerCtx, inbound.RequestID, inbound.Cwd, inbound.Label)
+					return s.dispatcher.HandleWorkspaceCreateIn(handlerCtx, inbound.RequestID, inbound.HerdrSession, inbound.Cwd, inbound.Label)
 				case "workspace_rename":
 					return s.dispatcher.HandleWorkspaceRename(handlerCtx, inbound.RequestID, inbound.WorkspaceID, inbound.Label)
 				case "workspace_reorder":
@@ -808,7 +816,8 @@ func (s *Server) Run(ctx context.Context) error {
 				continue
 			}
 			readCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
-			read, err := s.herdrC.ReadPane(readCtx, a.PaneID, 80, "ansi")
+			paneHerdr, rawPane := s.paneClient(a.PaneID)
+			read, err := paneHerdr.ReadPane(readCtx, rawPane, 80, "ansi")
 			cancel()
 			if err != nil {
 				s.recordSafeError("blocked pane enrichment failed", err)
@@ -870,12 +879,11 @@ func (s *Server) Run(ctx context.Context) error {
 		}()
 	}
 	startBackground(func() { s.poller.Run(ctx) })
-	eventClient := herdr.NewEventClient(s.cfg.SocketPath)
-	// Herdr builds without workspace.move_block also reject a
-	// workspace.reordered subscription, which would fail the whole
-	// events.subscribe and degrade realtime updates to polling.
-	eventClient.SetWorkspaceReorderedProbe(s.herdrC.SupportsWorkspaceMoveBlock)
-	startBackground(func() { s.poller.RunEvents(ctx, eventClient) })
+	// One event stream per running Herdr session. Herdr builds without
+	// workspace.move_block also reject a workspace.reordered subscription,
+	// which would fail the whole events.subscribe and degrade realtime updates
+	// to polling; the probe answers once for every session.
+	startBackground(func() { s.poller.RunSessionEvents(ctx, s.herdrC.SupportsWorkspaceMoveBlock) })
 	startBackground(func() { s.captureHistoryLoop(ctx) })
 	startBackground(func() { s.paneSizeM.Run(ctx) })
 	profileSignals := make(chan os.Signal, 1)
@@ -1206,7 +1214,8 @@ func (s *Server) enrichBlockedTransition(ctx context.Context, agent *coordinator
 	classification, err := classifyBlockedTransition(ctx, agent.Agent, func(readCtx context.Context) (string, error) {
 		attemptCtx, cancel := context.WithTimeout(readCtx, 3*time.Second)
 		defer cancel()
-		read, readErr := s.herdrC.ReadPane(attemptCtx, agent.PaneID, 80, "ansi")
+		paneHerdr, rawPane := s.paneClient(agent.PaneID)
+		read, readErr := paneHerdr.ReadPane(attemptCtx, rawPane, 80, "ansi")
 		return string(read.Content), readErr
 	})
 	if err != nil {
@@ -1433,7 +1442,8 @@ func (s *Server) scheduleHistoryCapture(ctx context.Context, paneID string) {
 		}()
 		readCtx, cancel := context.WithTimeout(taskCtx, 3*time.Second)
 		defer cancel()
-		read, err := s.herdrC.ReadPane(readCtx, paneID, history.MaxLines, "ansi")
+		paneHerdr, rawPane := s.paneClient(paneID)
+		read, err := paneHerdr.ReadPane(readCtx, rawPane, history.MaxLines, "ansi")
 		content := read.Content
 		if err != nil || len(content) == 0 || question.LayoutHint(string(content)) {
 			return
@@ -1507,7 +1517,8 @@ func (s *Server) captureFinishedPane(ctx context.Context, paneID, agent, cwd, se
 	}
 	readCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	read, err := s.herdrC.ReadPane(readCtx, paneID, history.MaxLines, "ansi")
+	paneHerdr, rawPane := s.paneClient(paneID)
+	read, err := paneHerdr.ReadPane(readCtx, rawPane, history.MaxLines, "ansi")
 	content := read.Content
 	if err != nil || len(content) == 0 {
 		return ""
@@ -1743,12 +1754,13 @@ func copyResponseError(err error) string {
 }
 
 func (s *Server) currentPaneRevision(ctx context.Context, paneID string) (int64, error) {
-	inventory, err := s.herdrC.GetInventory(ctx)
+	paneHerdr, rawPane := s.paneClient(paneID)
+	inventory, err := paneHerdr.GetInventory(ctx)
 	if err != nil {
 		return 0, err
 	}
 	for _, pane := range inventory.Panes {
-		if pane.ID == paneID {
+		if pane.ID == rawPane {
 			return int64(pane.Revision), nil
 		}
 	}

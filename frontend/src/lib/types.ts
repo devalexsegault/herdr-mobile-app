@@ -63,6 +63,8 @@ export interface RelayWorkspace {
   agent_status: string;
   cwd: string;
   worktree?: WorkspaceWorktree | null;
+  /** Herdr session the workspace lives in; empty for the base session. */
+  session?: string;
 }
 
 export interface WorktreeInfo {
@@ -215,6 +217,8 @@ export interface Agent {
   tab_number?: number;
   tab_order?: number;
   workspace_id?: string;
+  /** Herdr session the pane lives in; empty for the base session. */
+  herdr_session?: string;
   [key: string]: unknown;
 }
 
@@ -265,6 +269,17 @@ export interface ConversationPage {
   fileTruncated: boolean;
 }
 
+/**
+ * One Herdr session served by a relay. `prefix` is what the relay puts in
+ * front of that session's ids; the base session has none, so its ids are
+ * exactly what Herdr reports.
+ */
+export interface HerdrSessionInfo {
+  name: string;
+  prefix: string;
+  default: boolean;
+}
+
 /** One agent's Herdr state hook, as the relay reports it at connect. */
 export interface AgentIntegration {
   agent: string;
@@ -284,6 +299,8 @@ export interface RelayConnectionView {
    * say once, in Settings, rather than on every agent screen.
    */
   integrations: AgentIntegration[];
+  /** Herdr sessions this relay serves, base first. */
+  sessions: HerdrSessionInfo[];
   relay: RelayConfig;
   status: RelayStatus;
   /**
