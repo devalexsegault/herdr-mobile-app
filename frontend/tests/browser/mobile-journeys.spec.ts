@@ -5602,3 +5602,34 @@ test('keeps two Herdr sessions apart and names the second one', async ({ page })
   await page.locator('.home-fab').click();
   await expect(page.locator('#launch-session option')).toHaveText(['default (default)', 'hellocare']);
 });
+
+test('stops a running turn from the conversation', async ({ page }) => {
+  await boot(page, [fedora]);
+  await expect.poll(() => socketCount(page)).toBe(1);
+  await handshake(page, 0, {
+    capabilities: ['attention_classification', 'structured_questions', 'conversation_history'],
+  });
+  const agent = {
+    pane_id: 'w1:p1',
+    status: 'working',
+    project: 'Busy app',
+    agent: 'claude',
+    session: 'Current session',
+    conversation_history_available: true,
+  };
+  await server(page, 0, { type: 'agents', agents: [agent] });
+
+  await page.getByRole('button', { name: 'Open Busy app on Fedora' }).click();
+  await page.locator('.mode-switch').getByRole('button', { name: 'Chat' }).click();
+  await expect(page.getByRole('heading', { name: 'Conversation', exact: true })).toBeVisible();
+
+  // Stopping is a first-class chat action: no detour through the terminal keys.
+  await page.getByRole('button', { name: 'Stop the agent' }).click();
+  await expect.poll(async () => (await commands(page)).find((command) => command.type === 'send_keys'))
+    .toMatchObject({ pane_id: 'w1:p1', keys: ['Escape'] });
+  await expect(page.getByText('Stop sent.')).toBeVisible();
+
+  // Once the turn has ended there is nothing to stop.
+  await server(page, 0, { type: 'agents', agents: [{ ...agent, status: 'idle' }] });
+  await expect(page.getByRole('button', { name: 'Stop the agent' })).toBeHidden();
+});

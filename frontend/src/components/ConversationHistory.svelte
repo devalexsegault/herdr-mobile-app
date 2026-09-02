@@ -6,6 +6,7 @@
   import {
     agentNeedsInspection,
     agentNeedsResponse,
+    agentStatusGroup,
     approvalButtonTone,
     approvalOptions,
     approvalPromptPreview,
@@ -38,6 +39,7 @@
   let fileInput = $state<HTMLInputElement>(null!);
   let composer = $state(untrack(() => loadPromptDraft(agent)));
   let sendingPrompt = $state(false);
+  let stopping = $state(false);
   let uploadingImage = $state(false);
   let uploadStatus = $state('');
   let uploadError = $state(false);
@@ -51,6 +53,9 @@
 
   const modeEntries = $derived(mode === 'conversation' ? conversationEntries(entries) : entries);
   const inputLocked = $derived(agentNeedsResponse(agent) || agentNeedsInspection(agent));
+  // A running turn can be interrupted from the chat itself; Escape is what
+  // every supported agent CLI binds to "stop the current turn".
+  const working = $derived(agentStatusGroup(agent) === 'working');
   // An approval or a question is answered here, in the thread, rather than by
   // sending the person off to the raw terminal to find the prompt themselves.
   const interaction = $derived(questionInteraction(agent));
@@ -241,6 +246,24 @@
     if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
       void sendPrompt();
+    }
+  }
+
+  async function stopAgent() {
+    if (stopping) return;
+    stopping = true;
+    try {
+      await relayStore.sendToAgent(agent, {
+        type: 'send_keys',
+        keys: ['Escape'],
+        activity_label: 'Stopped the agent',
+      });
+      relayStore.showToast('Stop sent.');
+      setTimeout(() => { void loadLatest(); }, 500);
+    } catch (failure) {
+      relayStore.showToast(failure instanceof Error ? failure.message : 'The stop could not be sent.', true);
+    } finally {
+      stopping = false;
     }
   }
 
@@ -455,6 +478,21 @@
         ></textarea>
         {#if composer}<button type="button" class="input-clear" aria-label="Clear prompt text" onclick={clearComposer}>×</button>{/if}
       </div>
+      {#if working}
+        <Button
+          type="button"
+          size="icon"
+          variant="danger"
+          disabled={stopping}
+          aria-label="Stop the agent"
+          title="Interrupt the current turn"
+          onclick={() => { void stopAgent(); }}
+        >
+          <svg class="button-symbol" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+            <rect x="6" y="6" width="12" height="12" rx="2"></rect>
+          </svg>
+        </Button>
+      {/if}
       <Button
         type="submit"
         size="icon"

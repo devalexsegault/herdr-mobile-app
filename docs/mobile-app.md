@@ -59,7 +59,8 @@ An agent opens as a **conversation** whenever the relay can reconstruct one for
 that harness; `Chat`/`Terminal` in the header switches between the two views of
 the same pane, and the raw terminal keeps everything it always had. Approvals
 and structured questions are answered in the conversation itself, directly
-above the composer.
+above the composer. While a turn is running, a **Stop** button next to the
+composer interrupts it, the way Escape does in the terminal.
 
 ### When an agent has no conversation
 

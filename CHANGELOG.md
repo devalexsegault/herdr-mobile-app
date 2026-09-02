@@ -3,6 +3,13 @@
 Notable user-facing changes to Herdr Mobile Relay are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- The conversation view has a Stop button while the agent is working, so a
+  runaway turn can be interrupted without switching to the terminal keys.
+
 ## [0.20.1] - 2026-09-02
 
 ### Fixed
