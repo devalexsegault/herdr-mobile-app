@@ -22,9 +22,6 @@ import (
 	relayrelease "github.com/0cv/herdr-mobile-relay/internal/release"
 )
 
-const canonicalAPI = "https://api.github.com/repos/0cv/herdr-mobile-relay"
-const canonicalWeb = "https://github.com/0cv/herdr-mobile-relay"
-
 var appDeployEnvironmentKeys = [...]string{
 	"HERDR_APP_DEPLOY_ORIGIN",
 	"HERDR_CLOUDFLARE_PAGES_PROJECT",
@@ -93,8 +90,8 @@ func NewManager(releaseRoot, runtimeDir, herdrBin, version, revision, healthURL 
 		version:     version,
 		revision:    revision,
 		healthURL:   healthURL,
-		apiBase:     canonicalAPI,
-		webBase:     canonicalWeb,
+		apiBase:     apiBaseFor(Repository()),
+		webBase:     webBaseFor(Repository()),
 		client: &http.Client{
 			Timeout: 15 * time.Second,
 		},

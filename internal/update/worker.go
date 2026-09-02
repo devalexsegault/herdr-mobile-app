@@ -25,7 +25,6 @@ const (
 	updateWorkerTimeout = 15 * time.Minute
 	processTermGrace    = 2 * time.Second
 	processWaitDelay    = 4 * time.Second
-	updateRepository    = "0cv/herdr-mobile-relay"
 )
 
 var ErrConcurrent = errors.New("another update is already running")
@@ -189,7 +188,7 @@ func installPlugin(ctx context.Context, job Job) error {
 		job.HerdrBin,
 		"plugin",
 		"install",
-		updateRepository,
+		Repository(),
 		"--ref",
 		strings.ToLower(job.TargetRevision),
 		"--yes",

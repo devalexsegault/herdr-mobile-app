@@ -3,7 +3,7 @@
 Notable user-facing changes to Herdr Mobile Relay are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.20.0] - 2026-09-02
 
 ### Added
 
@@ -21,6 +21,10 @@ project follows [Semantic Versioning](https://semver.org/).
   `board_v1` only when the daemon answers, so a computer without the plugin
   shows nothing to explain away.
 
+- A relay installed from a fork updates from that fork. The plugin build
+  records the repository it installed from as `HERDR_RELEASE_REPOSITORY` in
+  `relay.env`, and the release check, the asset download and the phone-driven
+  upgrade all follow it instead of the upstream project.
 - One relay now serves every running Herdr session on its computer. The
   configured socket is the base session and keeps the ids it always had; the
   others are enumerated with `herdr session list` and their workspaces, tabs

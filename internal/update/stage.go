@@ -23,17 +23,16 @@ import (
 )
 
 const (
-	canonicalReleaseAssets = "https://github.com/0cv/herdr-mobile-relay/releases/download"
-	maxChecksumBytes       = 1 * 1024 * 1024
-	maxArchiveBytes        = 128 * 1024 * 1024
-	maxExtractedBytes      = 256 * 1024 * 1024
-	appReloadSignalGrace   = 2 * time.Second
-	maxArchiveEntries      = 4096
+	maxChecksumBytes     = 1 * 1024 * 1024
+	maxArchiveBytes      = 128 * 1024 * 1024
+	maxExtractedBytes    = 256 * 1024 * 1024
+	appReloadSignalGrace = 2 * time.Second
+	maxArchiveEntries    = 4096
 )
 
 func prepareTargetRelease(ctx context.Context, job Job) (stagedRelease, error) {
 	client := &http.Client{Timeout: 2 * time.Minute}
-	return prepareTargetReleaseFrom(ctx, job, canonicalReleaseAssets, client)
+	return prepareTargetReleaseFrom(ctx, job, assetsBaseFor(Repository()), client)
 }
 
 func prepareTargetReleaseFrom(

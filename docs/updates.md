@@ -15,6 +15,21 @@ verification fails.
 Phone-driven upgrades run `herdr plugin install` in a transient worker pinned
 to the release commit.
 
+## Installing from a fork
+
+`herdr plugin install <owner>/<repo>` works for any repository that publishes
+the same release bundles. The build records that repository as
+`HERDR_RELEASE_REPOSITORY` in `relay.env`, so the running relay checks *that*
+repository's releases, downloads its bundles and runs its phone-driven
+upgrades — it is never offered the upstream project's next version. Set the
+variable by hand only when the plugin checkout's `origin` is not a GitHub URL.
+
+A fork ships releases the same way upstream does: bump `version` in
+`herdr-plugin.toml`, refresh the committed `web/` bundle with `make
+web-release`, push the commit to `main`, then push a `v<version>` tag. The
+release workflow builds and verifies the bundles and publishes them; a tag
+whose commit is not on `main` is published as a prerelease, which relays skip.
+
 ## The deployment-owner role
 
 The relay-hosted app updates with its relay. For a separately hosted Cloudflare
