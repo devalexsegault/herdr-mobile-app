@@ -36,6 +36,7 @@ func TestUpdateWorkerLaunchForwardsAppDeploymentConfiguration(t *testing.T) {
 		"HERDR_APP_DEPLOY_NODE_DIR":      "/opt/node/bin",
 		"HERDR_RELAY_ENV":                "/home/cv/.config/herdr-mobile-relay/relay.env",
 		"HERDR_PLUGIN_CONFIG_DIR":        "/home/cv/.config/herdr-mobile-relay",
+		"HERDR_RELEASE_REPOSITORY":       "cv/herdr-mobile-relay-dev",
 		"CLOUDFLARE_API_TOKEN":           "must-not-be-forwarded",
 	}
 	lookup := func(key string) (string, bool) {
@@ -50,6 +51,7 @@ func TestUpdateWorkerLaunchForwardsAppDeploymentConfiguration(t *testing.T) {
 		"HERDR_APP_DEPLOY_NODE_DIR=/opt/node/bin",
 		"HERDR_RELAY_ENV=/home/cv/.config/herdr-mobile-relay/relay.env",
 		"HERDR_PLUGIN_CONFIG_DIR=/home/cv/.config/herdr-mobile-relay",
+		"HERDR_RELEASE_REPOSITORY=cv/herdr-mobile-relay-dev",
 	}
 
 	linux := updateWorkerLaunch("linux", "relay-update", "/opt/relay", "/tmp/job.json", lookup)

@@ -30,6 +30,9 @@ var appDeployEnvironmentKeys = [...]string{
 	"HERDR_APP_DEPLOY_NODE_DIR",
 	"HERDR_RELAY_ENV",
 	"HERDR_PLUGIN_CONFIG_DIR",
+	// The worker downloads the release itself, so it must follow the same
+	// repository the relay checked; systemd-run starts it with a clean env.
+	"HERDR_RELEASE_REPOSITORY",
 }
 
 var semverPattern = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
