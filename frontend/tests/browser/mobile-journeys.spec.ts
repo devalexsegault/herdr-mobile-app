@@ -5707,6 +5707,8 @@ test('inserts a slash command from the conversation picker', async ({ page }) =>
   const composer = page.getByRole('textbox', { name: 'Prompt' });
   await expect(composer).toHaveValue('/plan ');
   await page.getByRole('button', { name: 'Send prompt' }).click();
-  await expect.poll(async () => (await commands(page)).find((command) => command.type === 'submit_prompt')?.text?.trim())
-    .toBe('/plan');
+  await expect.poll(async () => {
+    const sent = (await commands(page)).find((command) => command.type === 'submit_prompt') as { text?: string } | undefined;
+    return sent?.text?.trim();
+  }).toBe('/plan');
 });
