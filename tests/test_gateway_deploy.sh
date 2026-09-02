@@ -5,6 +5,9 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+# The bundle pins the release named by the manifest, so the test reads it from
+# there instead of carrying a copy that goes stale at every version bump.
+PLUGIN_VERSION=$(sed -n 's/^version = "\([^"]*\)"/\1/p' "$REPO_DIR/herdr-plugin.toml")
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/herdr-gateway-deploy-test.XXXXXX")"
 trap 'rm -rf "$WORK_DIR"' EXIT
 
@@ -171,9 +174,9 @@ grep -Fq 'context: ${HERDR_GATEWAY_BUILD_CONTEXT:-./gateway-source}' \
     "$BUNDLE_DIR/docker-compose.yml" || fail "compose file lost the bundled build context"
 grep -Fq 'HERDR_GATEWAY_BUILD_CONTEXT="./gateway-source"' "$BUNDLE_DIR/.env" ||
     fail ".env lost the bundled build context"
-grep -Fq 'HERDR_GATEWAY_VERSION: ${HERDR_GATEWAY_VERSION:-0.19.1}' \
+grep -Fq "HERDR_GATEWAY_VERSION: \${HERDR_GATEWAY_VERSION:-$PLUGIN_VERSION}" \
     "$BUNDLE_DIR/docker-compose.yml" || fail "compose file does not pass the gateway release to the build"
-grep -Fq 'HERDR_GATEWAY_VERSION=0.19.1' "$BUNDLE_DIR/.env" ||
+grep -Fq "HERDR_GATEWAY_VERSION=$PLUGIN_VERSION" "$BUNDLE_DIR/.env" ||
     fail ".env does not record the deployed gateway release"
 grep -Eq '^HERDR_GATEWAY_REVISION=[0-9a-f]{40}$' "$BUNDLE_DIR/.env" ||
     fail ".env does not record the deployed gateway revision"
