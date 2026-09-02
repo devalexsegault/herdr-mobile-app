@@ -523,6 +523,13 @@ unset INSTALL_TOKEN
 if [ -n "$RELEASE_REPOSITORY" ] && [ -f "$TARGET_ENV" ]; then
     set_env_value_atomic "$TARGET_ENV" HERDR_RELEASE_REPOSITORY "$RELEASE_REPOSITORY"
 fi
+# A service installed by the stable-tunnel wizard reads the checkout's own env
+# file, not the plugin config one; the running relay must learn the repository
+# from whichever file its unit actually names.
+SERVICE_ENV="$(installed_service_env_file 2>/dev/null || true)"
+if [ -n "$RELEASE_REPOSITORY" ] && [ -n "$SERVICE_ENV" ] && [ "$SERVICE_ENV" != "$TARGET_ENV" ] && [ -f "$SERVICE_ENV" ]; then
+    set_env_value_atomic "$SERVICE_ENV" HERDR_RELEASE_REPOSITORY "$RELEASE_REPOSITORY"
+fi
 
 # Cut over an existing service to the new release root.
 SERVICE_WRAPPER="$INSTALL_ROOT/current/relay/herdr-mobile-relay-service.sh"

@@ -3,6 +3,14 @@
 Notable user-facing changes to Herdr Mobile Relay are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- The plugin build also records the install repository in the env file a
+  stable-tunnel service actually reads, so a relay installed as a service
+  checks the fork for updates instead of upstream.
+
 ## [0.20.4] - 2026-09-02
 
 ### Added
