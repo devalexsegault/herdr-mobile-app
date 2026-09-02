@@ -515,13 +515,14 @@ WEB_HASH=$(sed -n 's/^[[:space:]]*"web_hash":[[:space:]]*"\([^"]*\)".*/\1/p' "$M
 # path, so the relay, cloudflared, and agent subprocesses never inherit it.
 if [ -n "$INSTALL_TOKEN" ]; then
     GH_TOKEN="$INSTALL_TOKEN" ensure_relay_env "$TARGET_ENV"
-    # The running relay checks for updates on the repository it was installed
-    # from; without this a fork would be offered upstream's next release.
-    if [ -n "$RELEASE_REPOSITORY" ]; then
-        set_env_value_atomic "$TARGET_ENV" HERDR_RELEASE_REPOSITORY "$RELEASE_REPOSITORY"
-    fi
 fi
 unset INSTALL_TOKEN
+# The running relay checks for updates on the repository it was installed
+# from; without this a fork would be offered upstream's next release. Public
+# forks install without a token, so this must not hide behind the credential.
+if [ -n "$RELEASE_REPOSITORY" ] && [ -f "$TARGET_ENV" ]; then
+    set_env_value_atomic "$TARGET_ENV" HERDR_RELEASE_REPOSITORY "$RELEASE_REPOSITORY"
+fi
 
 # Cut over an existing service to the new release root.
 SERVICE_WRAPPER="$INSTALL_ROOT/current/relay/herdr-mobile-relay-service.sh"

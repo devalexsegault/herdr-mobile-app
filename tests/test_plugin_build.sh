@@ -222,6 +222,9 @@ grep -Fx "Environment=HERDR_RELAY_ENV=$TARGET_CONFIG/relay.env" "$UNIT_FILE" >/d
 grep -F source-token "$TARGET_CONFIG/relay.env" >/dev/null
 grep -F source-instance "$TARGET_CONFIG/relay.env" >/dev/null
 grep -F "HERDR_GITHUB_TOKEN_FILE='$TARGET_CONFIG/github-token'" "$TARGET_CONFIG/relay.env" >/dev/null
+# The relay's updater follows the install repository, credential or not.
+grep -F "HERDR_RELEASE_REPOSITORY='0cv/herdr-mobile-relay-dev'" "$TARGET_CONFIG/relay.env" >/dev/null ||
+    { echo "the relay env does not name the install repository for updates" >&2; exit 1; }
 test "$(cat "$TARGET_CONFIG/push/subscriptions.json")" = source-subscriptions
 test "$(cat "$TARGET_CONFIG/update-state.json")" = source-update
 test "$(cat "$TARGET_CONFIG/app-deploy-state.json")" = source-app-deploy

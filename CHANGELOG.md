@@ -3,6 +3,16 @@
 Notable user-facing changes to Herdr Mobile Relay are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
+## [0.20.1] - 2026-09-02
+
+### Fixed
+
+- The relay installed from a public fork now records that fork as its update
+  repository. The setting was only written when the install used a GitHub
+  credential, so a public fork's relay would have followed upstream releases.
+- The gateway bundle test reads the pinned release from the manifest instead of
+  carrying a copy that broke at every version bump.
+
 ## [0.20.0] - 2026-09-02
 
 ### Added
