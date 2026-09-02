@@ -422,6 +422,9 @@ textarea { min-height: 6.5rem; resize: vertical; }
 .conversation-input-area { border-top: 1px solid var(--border); flex: 0 0 auto; margin-top: auto; min-width: 0; padding-top: .7rem; }
 .conversation-composer { align-items: flex-end; display: flex; gap: .5rem; }
 .conversation-composer-status { color: var(--muted); font-size: .68rem; margin: .35rem .2rem 0; }
+.composer-slash { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 1.1rem; font-weight: 700; }
+.command-picker { display: flex; flex-direction: column; gap: .5rem; }
+.command-picker-list { max-height: 55vh; }
 .conversation-composer-status.error { color: var(--danger); }
 /* The turns live in their own box so a ResizeObserver can watch the height of
    the content itself: the scroller's box never changes when a turn is added or

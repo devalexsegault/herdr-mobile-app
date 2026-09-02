@@ -5676,3 +5676,37 @@ test('updates a relay-hosted app through the relay that serves it', async ({ pag
   await expect.poll(async () => (await commands(page)).find((command) => command.type === 'install_update'))
     .toBeTruthy();
 });
+
+test('inserts a slash command from the conversation picker', async ({ page }) => {
+  await boot(page, [fedora]);
+  await expect.poll(() => socketCount(page)).toBe(1);
+  await handshake(page, 0, {
+    capabilities: ['attention_classification', 'structured_questions', 'conversation_history', 'slash_commands'],
+  });
+  await server(page, 0, {
+    type: 'agents',
+    agents: [{
+      pane_id: 'w1:p1',
+      status: 'idle',
+      project: 'Cmd app',
+      agent: 'claude',
+      session: 'Current session',
+      conversation_history_available: true,
+    }],
+  });
+
+  await page.getByRole('button', { name: 'Open Cmd app on Fedora' }).click();
+  await page.locator('.mode-switch').getByRole('button', { name: 'Chat' }).click();
+  await page.getByRole('button', { name: 'Commands' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Commands' });
+  await expect(dialog.getByRole('option', { name: /\/help/ })).toBeVisible();
+  await dialog.getByRole('searchbox', { name: 'Filter commands' }).fill('plan');
+  await expect(dialog.getByRole('option')).toHaveCount(1);
+  await dialog.getByRole('option', { name: /\/plan/ }).click();
+  await expect(dialog).toBeHidden();
+  const composer = page.getByRole('textbox', { name: 'Prompt' });
+  await expect(composer).toHaveValue('/plan ');
+  await page.getByRole('button', { name: 'Send prompt' }).click();
+  await expect.poll(async () => (await commands(page)).find((command) => command.type === 'submit_prompt')?.text?.trim())
+    .toBe('/plan');
+});

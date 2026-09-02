@@ -2,6 +2,7 @@
   import { onMount, tick, untrack } from 'svelte';
   import ConversationMessage from '$components/ConversationMessage.svelte';
   import QuestionForm from '$components/QuestionForm.svelte';
+  import AppDialog from '$components/ui/AppDialog.svelte';
   import Button from '$components/ui/Button.svelte';
   import {
     agentNeedsInspection,
@@ -16,7 +17,7 @@
   import { conversationEntries } from '$lib/conversation';
   import { clearPromptDraft, loadPromptDraft, savePromptDraft } from '$lib/prompt-drafts';
   import { relayStore } from '$lib/store';
-  import type { Agent, ConversationEntry } from '$lib/types';
+  import type { Agent, ConversationEntry, SlashCommand, SlashCommandCatalog } from '$lib/types';
 
   let { agent }: { agent: Agent } = $props();
 
@@ -40,6 +41,13 @@
   let composer = $state(untrack(() => loadPromptDraft(agent)));
   let sendingPrompt = $state(false);
   let stopping = $state(false);
+  // The command picker: the chat has no terminal autocomplete, so the
+  // catalogue the terminal shows on "/" is offered behind a button instead.
+  let commandsOpen = $state(false);
+  let commandQuery = $state('');
+  let commandCatalog = $state<SlashCommandCatalog>({ commands: [], truncated: false });
+  let commandsLoading = $state(false);
+  let commandsError = $state('');
   let uploadingImage = $state(false);
   let uploadStatus = $state('');
   let uploadError = $state(false);
@@ -247,6 +255,38 @@
       event.preventDefault();
       void sendPrompt();
     }
+  }
+
+  const filteredCommands = $derived.by(() => {
+    const query = commandQuery.trim().replace(/^\//, '').toLocaleLowerCase();
+    if (!query) return commandCatalog.commands;
+    return commandCatalog.commands.filter((entry) => (
+      entry.command.slice(1).toLocaleLowerCase().includes(query)
+      || entry.description.toLocaleLowerCase().includes(query)
+    ));
+  });
+
+  async function openCommands() {
+    commandsOpen = true;
+    commandQuery = '';
+    if (commandCatalog.commands.length || commandsLoading) return;
+    commandsLoading = true;
+    commandsError = '';
+    try {
+      commandCatalog = await relayStore.loadSlashCommands(agent);
+    } catch (failure) {
+      commandsError = failure instanceof Error ? failure.message : 'Commands are unavailable for this agent.';
+    } finally {
+      commandsLoading = false;
+    }
+  }
+
+  async function pickCommand(entry: SlashCommand) {
+    composer = `${entry.command}${entry.argument_hint ? ' ' : ''}`;
+    commandsOpen = false;
+    await tick();
+    composerElement?.focus();
+    composerElement?.setSelectionRange(composer.length, composer.length);
   }
 
   async function stopAgent() {
@@ -460,6 +500,15 @@
           <path d="m4 17 4.5-4.5 3.5 3.5 2.5-2.5L20 19"></path>
         </svg>
       </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        class="composer-slash"
+        disabled={inputLocked || sendingPrompt}
+        aria-label="Commands"
+        title="Insert a slash command"
+        onclick={() => { void openCommands(); }}
+      >/</Button>
       <div class:has-text={Boolean(composer)} class="composer-field">
         <textarea
           bind:this={composerElement}
@@ -515,3 +564,39 @@
     {/if}
   </div>
 </main>
+
+<AppDialog id="conversation-commands" bind:open={commandsOpen} title="Commands" description="Slash commands this agent accepts. Pick one to put it in the composer.">
+  <div class="command-picker">
+    <input
+      type="search"
+      placeholder="Filter commands"
+      aria-label="Filter commands"
+      bind:value={commandQuery}
+      autocomplete="off"
+      autocapitalize="off"
+      spellcheck="false"
+    />
+    {#if commandsLoading}
+      <p class="slash-command-status" role="status">Loading commands…</p>
+    {:else if commandsError}
+      <p class="slash-command-status" role="alert">{commandsError}</p>
+    {:else if !filteredCommands.length}
+      <p class="slash-command-status">No matching command.</p>
+    {/if}
+    <div class="slash-command-menu command-picker-list" role="listbox" aria-label="Slash commands">
+      {#each filteredCommands as entry (entry.command)}
+        <button type="button" role="option" aria-selected="false" onclick={() => { void pickCommand(entry); }}>
+          <span class="slash-command-name">
+            <strong>{entry.command}</strong>
+            {#if entry.argument_hint}<small>{entry.argument_hint}</small>{/if}
+          </span>
+          <span class="slash-command-description">{entry.description}</span>
+          {#if entry.source !== 'builtin'}<em class="slash-command-source">{entry.source}</em>{/if}
+        </button>
+      {/each}
+    </div>
+    {#if !commandsLoading && commandCatalog.truncated}
+      <p class="slash-command-limit">More commands exist; filter to narrow the list.</p>
+    {/if}
+  </div>
+</AppDialog>

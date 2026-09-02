@@ -3,6 +3,14 @@
 Notable user-facing changes to Herdr Mobile Relay are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
+## [0.20.4] - 2026-09-02
+
+### Added
+
+- The conversation composer has a "/" button that opens the agent's slash
+  command catalogue with a filter; picking a command puts it in the composer,
+  the way the terminal's "/" autocomplete does.
+
 ## [0.20.3] - 2026-09-02
 
 ### Fixed

@@ -60,7 +60,8 @@ that harness; `Chat`/`Terminal` in the header switches between the two views of
 the same pane, and the raw terminal keeps everything it always had. Approvals
 and structured questions are answered in the conversation itself, directly
 above the composer. While a turn is running, a **Stop** button next to the
-composer interrupts it, the way Escape does in the terminal.
+composer interrupts it, the way Escape does in the terminal. The **/** button
+opens the agent's slash commands so one can be picked without typing it.
 
 ### When an agent has no conversation
 
