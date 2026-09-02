@@ -10,6 +10,12 @@ project follows [Semantic Versioning](https://semver.org/).
 - The conversation view has a Stop button while the agent is working, so a
   runaway turn can be interrupted without switching to the terminal keys.
 
+### Changed
+
+- Today names each agent by its Herdr tab ("Sitemap", "perf-annuaire") instead
+  of its harness, which was "claude" for every row; the harness moves to the
+  secondary line.
+
 ## [0.20.1] - 2026-09-02
 
 ### Fixed

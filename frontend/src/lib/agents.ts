@@ -81,6 +81,15 @@ export function agentContextLabel(agent: Partial<Agent>): string {
   return String(agent.cwd || '').split(/[\\/]/).filter(Boolean).pop() || '';
 }
 
+/**
+ * What a person calls the pane: the Herdr tab name ("Sitemap",
+ * "perf-annuaire") when it has one, else the harness ("claude"). The project
+ * is shown around it, never as the name itself.
+ */
+export function agentTitle(agent: Partial<Agent>): string {
+  return tabName(agent) || String(agent.agent || '').trim() || displayName(agent);
+}
+
 export function displayName(agent: Partial<Agent>): string {
   return String(agent.project || agent.name || agent.tab_label || agent.agent || 'agent');
 }
