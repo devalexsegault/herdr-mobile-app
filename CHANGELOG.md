@@ -3,6 +3,16 @@
 Notable user-facing changes to Herdr Mobile Relay are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
+## [0.20.3] - 2026-09-02
+
+### Fixed
+
+- A relay-hosted app (the phone app served from the relay's own tunnel, as
+  Quick Start does) can update again from Settings. The app treated every
+  newer release as needing a deployment owner and told the user the app was
+  "separately hosted"; it now offers the update of the relay that serves it,
+  and reloads once that relay restarts.
+
 ## [0.20.2] - 2026-09-02
 
 ### Added

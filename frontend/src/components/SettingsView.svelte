@@ -58,6 +58,7 @@
     checkAppUpdate,
     MANAGED_UPDATE_COMMAND,
     relayNeedsManualBootstrap,
+    relayServesCurrentOrigin,
     queueUpdateProgressForReload,
     reloadApp,
     setUpdateProgressError,
@@ -148,6 +149,20 @@
     && connection.appDeploy.configured
     && connection.appDeploy.origin === location.origin
   )));
+  // A relay-hosted app has no deployment owner: the relay whose tunnel serves
+  // this origin is the app. Updating that relay is what updates the app.
+  const originRelay = $derived(relayRows.find(({ connection }) => (
+    connection?.status === 'connected' && relayServesCurrentOrigin(connection.relay.url)
+  )));
+  const originRelayInstallable = $derived.by(() => {
+    const connection = originRelay?.connection;
+    if (!connection || relayNeedsManualBootstrap(connection)) return false;
+    const update = connection.update;
+    return connection.capabilities.includes('self_update')
+      && update.state === 'available'
+      && Boolean(update.can_install)
+      && Boolean(update.target_revision);
+  });
   // The owner relay is behind the released app version but can self-update to
   // exactly that version, so one action can deploy the app before updating it.
   const ownerUpdateReady = $derived.by(() => {
@@ -174,6 +189,15 @@
     }
     if ($appUpdate.state === 'deployment-required') {
       const owner = appDeploymentOwner;
+      if (!owner?.connection && originRelay && originRelayInstallable) {
+        return {
+          kind: 'install_relay',
+          relayId: originRelay.relay.id,
+          targetVersion: originRelay.connection!.update.available_version,
+          appRelayId: '',
+          description: `${originRelay.relay.label} serves this app. Updating it updates the app, which reloads once the relay restarts.`,
+        };
+      }
       if (!owner?.connection || !targetVersion) return null;
       if (owner.connection.releaseVersion === targetVersion
         && ['scheduled', 'deploying'].includes(owner.connection.appDeploy.state)) return null;
@@ -677,6 +701,8 @@
             {:else}
               <p class="hint">{appDeploymentOwner.relay.label} is authorized to deploy this app origin.</p>
             {/if}
+          {:else if originRelay}
+            <p class="hint">{originRelay.relay.label} serves this app, so updating that relay updates the app.{originRelayInstallable ? '' : ' No installable relay update is available from it yet.'}</p>
           {:else}
             <p class="hint">This is a separately hosted app. Configure one relay as its deployment owner:</p>
             <pre class="update-command"><code>{APP_DEPLOY_SETUP_COMMAND}</code></pre>

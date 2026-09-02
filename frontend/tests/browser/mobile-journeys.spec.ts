@@ -5633,3 +5633,46 @@ test('stops a running turn from the conversation', async ({ page }) => {
   await server(page, 0, { type: 'agents', agents: [{ ...agent, status: 'idle' }] });
   await expect(page.getByRole('button', { name: 'Stop the agent' })).toBeHidden();
 });
+
+test('updates a relay-hosted app through the relay that serves it', async ({ page }) => {
+  // The app is loaded from the relay's own tunnel: same origin, no deployment
+  // owner. A newer release must be offered as a plain relay update.
+  const local = { id: 'local', label: 'Local', url: 'ws://127.0.0.1:4173', token: '' };
+  const availableUpdate = {
+    state: 'available',
+    current_version: APP_RELEASE,
+    current_revision: 'a'.repeat(40),
+    available_version: '99.0.0',
+    available_revision: 'f'.repeat(12),
+    target_revision: 'f'.repeat(40),
+    upstream_version: '99.0.0',
+    checked_at: 124,
+    can_install: true,
+    mode: 'plugin',
+  };
+  await page.route('**/version.json?*', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ version: APP_RELEASE, assets: APP_METADATA.assets }),
+    });
+  });
+  await boot(page, [local]);
+  await expect.poll(() => socketCount(page)).toBe(1);
+  await handshake(page, 0, {
+    release_version: APP_RELEASE,
+    capabilities: ['directory_browser', 'self_update'],
+    update: availableUpdate,
+  });
+
+  await page.getByRole('button', { name: 'Settings, phone app and relay updates available' }).click();
+  await expect(page.getByText('Version 99.0.0 is released, but this app origin still serves')).toBeVisible();
+  await expect(page.getByText('Local serves this app, so updating that relay updates the app.')).toBeVisible();
+  await expect(page.getByText('separately hosted app')).toBeHidden();
+  const update = page.getByRole('button', { name: 'Update Relays' });
+  await expect(update).toBeEnabled();
+  await update.click();
+  await expect(page.getByRole('dialog')).toContainText('Local serves this app. Updating it updates the app');
+  await page.getByRole('button', { name: 'Start Update' }).click();
+  await expect.poll(async () => (await commands(page)).find((command) => command.type === 'install_update'))
+    .toBeTruthy();
+});
