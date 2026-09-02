@@ -472,3 +472,24 @@ func writeWorkerTestRelease(t *testing.T, root, version, revision string) {
 		t.Fatal(err)
 	}
 }
+
+func TestInstallEnvironmentCarriesTheHerdrCLI(t *testing.T) {
+	t.Setenv("PATH", "/usr/local/bin:/usr/bin:/bin")
+	t.Setenv("HERDR_BIN", "/stale/herdr")
+	environment := installEnvironment(Job{HerdrBin: "/home/cv/.local/bin/herdr"})
+	var path, herdrBin string
+	for _, item := range environment {
+		switch {
+		case strings.HasPrefix(item, "PATH="):
+			path = strings.TrimPrefix(item, "PATH=")
+		case strings.HasPrefix(item, "HERDR_BIN="):
+			herdrBin = strings.TrimPrefix(item, "HERDR_BIN=")
+		}
+	}
+	if !strings.HasPrefix(path, "/home/cv/.local/bin:") || !strings.HasSuffix(path, ":/usr/bin:/bin") {
+		t.Fatalf("PATH = %q, want the CLI directory prepended", path)
+	}
+	if herdrBin != "/home/cv/.local/bin/herdr" {
+		t.Fatalf("HERDR_BIN = %q", herdrBin)
+	}
+}

@@ -32,7 +32,7 @@ const (
 
 func prepareTargetRelease(ctx context.Context, job Job) (stagedRelease, error) {
 	client := &http.Client{Timeout: 2 * time.Minute}
-	return prepareTargetReleaseFrom(ctx, job, assetsBaseFor(Repository()), client)
+	return prepareTargetReleaseFrom(ctx, job, assetsBase(), client)
 }
 
 func prepareTargetReleaseFrom(

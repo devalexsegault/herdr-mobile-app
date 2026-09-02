@@ -37,3 +37,13 @@ func webBaseFor(repository string) string {
 func assetsBaseFor(repository string) string {
 	return webBaseFor(repository) + "/releases/download"
 }
+
+// assetsBase is where the worker downloads releases from. The update
+// rehearsal points it at a local stand-in for GitHub; a real relay never sets
+// the variable.
+func assetsBase() string {
+	if value := strings.TrimSpace(os.Getenv("HERDR_RELEASE_DOWNLOAD_BASE")); value != "" {
+		return value
+	}
+	return assetsBaseFor(Repository())
+}

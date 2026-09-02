@@ -51,6 +51,19 @@ Pages cache state. Set `HERDR_APP_DEPLOY_ATTACH_DOMAIN=true` to allow that
 without being asked, or `false` to refuse. Otherwise it names the credential to
 set and offers to take a different origin.
 
+## The update rehearsal
+
+`make update-rehearsal` (`tests/test_update_rehearsal.sh`, also a CI job) plays a
+phone-triggered update the way it really runs: the update worker starts under a
+service manager's bare environment with only the variables the relay forwards,
+asks the Herdr CLI to reinstall the plugin, and the real plugin build and
+installer download the next release from a fork-named repository served by a
+local stand-in for GitHub (`HERDR_RELEASE_DOWNLOAD_BASE`,
+`HERDR_RELEASE_BASE_URL`, `HERDR_RELEASE_API_BASE`). It fails when the worker
+cannot find the CLI without PATH, downloads from the wrong repository, or
+leaves the relay env without the install repository — each of which once
+broke a real update.
+
 ## Release checks and app reloads
 
 Release checks use the GitHub API. When an unauthenticated request is rate

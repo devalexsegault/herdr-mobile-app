@@ -193,13 +193,13 @@ func installPlugin(ctx context.Context, job Job) error {
 		strings.ToLower(job.TargetRevision),
 		"--yes",
 	)
-	command.Env = environmentWith("HERDR_MOBILE_RELAY_NO_AUTO_SETUP", "1")
+	command.Env = installEnvironment(job)
 	output, err := runCommandContext(ctx, command)
 	if err != nil {
 		return fmt.Errorf(
 			"Herdr plugin install failed: %s: %s",
 			err,
-			compact(string(output), 500),
+			compactTail(string(output), 700),
 		)
 	}
 	return nil
@@ -273,6 +273,40 @@ func terminateProcessGroup(pgid int, waitCh <-chan error) bool {
 func processGroupAlive(pgid int) bool {
 	err := syscall.Kill(-pgid, 0)
 	return err == nil || errors.Is(err, syscall.EPERM)
+}
+
+// installEnvironment is the worker's own environment plus what the plugin
+// build needs from it: no interactive setup, the Herdr CLI it was told to use,
+// and that CLI's directory on PATH, since the service manager that starts the
+// worker does not carry the user's bin directory.
+func installEnvironment(job Job) []string {
+	environment := environmentWith("HERDR_MOBILE_RELAY_NO_AUTO_SETUP", "1")
+	if job.HerdrBin == "" {
+		return environment
+	}
+	binDir := filepath.Dir(job.HerdrBin)
+	path := os.Getenv("PATH")
+	for _, entry := range filepath.SplitList(path) {
+		if entry == binDir {
+			binDir = ""
+			break
+		}
+	}
+	if binDir != "" {
+		if path == "" {
+			path = binDir
+		} else {
+			path = binDir + string(os.PathListSeparator) + path
+		}
+	}
+	result := make([]string, 0, len(environment)+2)
+	for _, item := range environment {
+		if strings.HasPrefix(item, "PATH=") || strings.HasPrefix(item, "HERDR_BIN=") {
+			continue
+		}
+		result = append(result, item)
+	}
+	return append(result, "PATH="+path, "HERDR_BIN="+job.HerdrBin)
 }
 
 func environmentWith(key, value string) []string {
@@ -535,6 +569,17 @@ func fail(filename string, state State, err error) error {
 
 func safeError(err error) string {
 	return compact(err.Error(), 500)
+}
+
+// compactTail keeps the end of a command's output: an installer prints its
+// preview first and the reason it stopped last, and the reason is what the
+// phone needs to show.
+func compactTail(value string, limit int) string {
+	value = strings.Join(strings.Fields(value), " ")
+	if len(value) > limit {
+		return "…" + value[len(value)-limit:]
+	}
+	return value
 }
 
 func compact(value string, limit int) string {

@@ -3,6 +3,25 @@
 Notable user-facing changes to Herdr Mobile Relay are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
+## [0.20.7] - 2026-09-02
+
+### Fixed
+
+- Updating from the phone works again on a relay installed as a service. The
+  update worker runs without the user's bin directory on PATH, so the plugin
+  build could not ask Herdr for its config directory, fell back to a legacy
+  path and refused it. The worker now passes the Herdr CLI and its directory
+  to the build, and the build honours `HERDR_BIN` before PATH lookup.
+- A failed plugin install now reports the end of the installer's output, where
+  the reason is, instead of its opening preview.
+
+### Added
+
+- `make update-rehearsal`, also a CI job: a phone-triggered update played end
+  to end with the real worker, build and installer under a bare service
+  environment, against a fork-named release served locally. It fails on each
+  of the environment problems that broke real updates.
+
 ## [0.20.6] - 2026-09-02
 
 ### Fixed

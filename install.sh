@@ -3,6 +3,9 @@
 set -eu
 
 REPO=${HERDR_RELEASE_REPOSITORY:-0cv/herdr-mobile-relay}
+# Test and development hook: a stand-in for GitHub's API. Release downloads
+# already follow HERDR_RELEASE_BASE_URL.
+API_BASE=${HERDR_RELEASE_API_BASE:-https://api.github.com}
 BINARY=herdr-mobile-relay
 
 info() { printf '==> %s\n' "$1" >&2; }
@@ -372,7 +375,7 @@ main() {
     commit_json_path="$work_dir/commit.json"
 
     info "Resolving ${BINARY} ${version} (${target}) from ${REPO}"
-    fetch_json "https://api.github.com/repos/${REPO}/commits/${tag}" > "$commit_json_path" ||
+    fetch_json "${API_BASE}/repos/${REPO}/commits/${tag}" > "$commit_json_path" ||
         fatal "could not resolve release tag from GitHub API (private repositories require GH_TOKEN; SSH access authenticates Git only)"
     commit_json=$(awk '{ printf "%s", $0 }' "$commit_json_path")
     tag_revision=$(resolve_tag_revision "$commit_json")
@@ -382,7 +385,7 @@ main() {
     esac
     info "Downloading ${archive} from ${REPO}"
     if [ -n "${GH_TOKEN:-}" ]; then
-        api_url="https://api.github.com/repos/${REPO}/releases/tags/${tag}"
+        api_url="${API_BASE}/repos/${REPO}/releases/tags/${tag}"
         release_json_path="$work_dir/release.json"
         fetch_json "$api_url" > "$release_json_path" ||
             fatal "could not fetch release metadata from GitHub API"

@@ -31,8 +31,15 @@ if [ -n "$RELEASE_REPOSITORY" ]; then
     export HERDR_RELEASE_REPOSITORY="$RELEASE_REPOSITORY"
 fi
 TARGET_CONFIG_ROOT=${HERDR_PLUGIN_CONFIG_DIR:-}
-if [ -z "$TARGET_CONFIG_ROOT" ] && command -v herdr >/dev/null 2>&1; then
-    TARGET_CONFIG_ROOT="$(herdr plugin config-dir herdr-mobile-relay.events 2>/dev/null || true)"
+# The relay's update worker runs under a service manager whose PATH does not
+# include the user's bin directory, so it names the Herdr CLI in HERDR_BIN;
+# everything else finds herdr on PATH.
+HERDR_CLI=${HERDR_BIN:-}
+if [ -z "$HERDR_CLI" ] && command -v herdr >/dev/null 2>&1; then
+    HERDR_CLI=herdr
+fi
+if [ -z "$TARGET_CONFIG_ROOT" ] && [ -n "$HERDR_CLI" ]; then
+    TARGET_CONFIG_ROOT="$("$HERDR_CLI" plugin config-dir herdr-mobile-relay.events 2>/dev/null || true)"
 fi
 TARGET_CONFIG_ROOT=${TARGET_CONFIG_ROOT:-"${XDG_CONFIG_HOME:-$HOME/.config}/herdr-mobile-relay"}
 case "$TARGET_CONFIG_ROOT" in
@@ -429,7 +436,7 @@ release_api_available_without_token() {
     curl --fail --silent --show-error --location \
         --connect-timeout 5 --max-time 10 \
         -H "Accept: application/vnd.github+json" \
-        "https://api.github.com/repos/$RELEASE_REPOSITORY" >/dev/null 2>&1
+        "${HERDR_RELEASE_API_BASE:-https://api.github.com}/repos/$RELEASE_REPOSITORY" >/dev/null 2>&1
 }
 
 explain_missing_release_auth() {

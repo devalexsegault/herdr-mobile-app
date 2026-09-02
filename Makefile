@@ -9,7 +9,7 @@ WRANGLER_VERSION ?= 4.125.0
 PATH := /opt/homebrew/bin:/usr/local/bin:/home/linuxbrew/.linuxbrew/bin:$(HOME)/.local/bin:$(PATH)
 export PATH
 
-.PHONY: help setup setup-link app-deploy-setup rotate-token quick-start dev-tunnel stable-setup stable-teardown gateway check go-check backend-check shell-check production-path-audit cross-build release-bundle-check frontend-check frontend-browser frontend-browser-release frontend-browser-attention-release relay-plugin service-install service-uninstall service-status service-logs web-bundle-check web-release web-release-check web-deploy web-preview
+.PHONY: update-rehearsal help setup setup-link app-deploy-setup rotate-token quick-start dev-tunnel stable-setup stable-teardown gateway check go-check backend-check shell-check production-path-audit cross-build release-bundle-check frontend-check frontend-browser frontend-browser-release frontend-browser-attention-release relay-plugin service-install service-uninstall service-status service-logs web-bundle-check web-release web-release-check web-deploy web-preview
 
 help:
 	@echo "Common targets:"
@@ -75,7 +75,7 @@ nat-matrix:
 # then browser-tests `web/`, so running the same suite against `dist` here only
 # doubles the slowest gate. `make frontend-browser` stays for iterating on a
 # build before `web/` is regenerated.
-check: backend-check frontend-check web-release-check cross-build release-bundle-check
+check: backend-check frontend-check web-release-check cross-build release-bundle-check update-rehearsal
 
 go-check:
 	@test -z "$$(gofmt -l $$(find . -name '*.go' -not -path './frontend/node_modules/*'))"
@@ -116,6 +116,12 @@ cross-build:
 				-o "$$tmp/$$(basename $$command)-$$os-$$arch" "$$command" || exit; \
 		done; \
 	done
+
+# Rehearse a phone-triggered update end to end: the real update worker under
+# a service manager's bare environment, the real plugin build and installer,
+# and a fork-named release served by a local stand-in for GitHub.
+update-rehearsal:
+	bash tests/test_update_rehearsal.sh
 
 release-bundle-check:
 	@tmp="$$(mktemp -d)"; trap 'rm -rf "$$tmp"' EXIT; \
