@@ -41,10 +41,12 @@ test('drives captured attention panes through the real relay', async ({ page }) 
   await page.getByRole('button', { name: 'Back' }).click();
 
   await approvalCard.getByRole('button', { name: 'Allow once', exact: true }).click();
-  await expect.poll(async () => (await operations()).some((operation) =>
-    JSON.stringify(operation.argv) === JSON.stringify([
-      'pane', 'send-keys', 'qoder-approval', 'Up', 'Up', 'Enter',
-    ]))).toBe(true);
+  // Approval keys go out one write at a time, like question input.
+  await expect.poll(async () => (await operations())
+    .filter((operation) =>
+      operation.argv?.[1] === 'send-keys' &&
+      operation.argv?.[2] === 'qoder-approval')
+    .map((operation) => operation.argv?.slice(3))).toEqual([['Up'], ['Up'], ['Enter']]);
 
   await page.getByRole('button', { name: /Open qoder-notes on Captured relay/ }).click();
   await expect(page.getByRole('group', {
@@ -105,10 +107,11 @@ test('drives captured attention panes through the real relay', async ({ page }) 
   await expect(page.getByRole('button', { name: 'Approve and compact context', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Approve and keep context (~18k / 272k)', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Refine plan', exact: true }).click();
-  await expect.poll(async () => (await operations()).some((operation) =>
-    JSON.stringify(operation.argv) === JSON.stringify([
-      'pane', 'send-keys', 'omp-plan-approval', 'Down', 'Down', 'Down', 'Enter',
-    ]))).toBe(true);
+  await expect.poll(async () => (await operations())
+    .filter((operation) =>
+      operation.argv?.[1] === 'send-keys' &&
+      operation.argv?.[2] === 'omp-plan-approval')
+    .map((operation) => operation.argv?.slice(3))).toEqual([['Down'], ['Down'], ['Down'], ['Enter']]);
   await page.getByRole('button', { name: 'Back' }).click();
 
   await page.getByRole('button', { name: /Open omp-partial-ask on Captured relay/ }).click();
