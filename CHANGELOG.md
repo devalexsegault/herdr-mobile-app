@@ -3,6 +3,19 @@
 Notable user-facing changes to Herdr Mobile Relay are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
+## [0.20.6] - 2026-09-02
+
+### Fixed
+
+- Answering an approval in the conversation view keeps the sent answer on
+  screen while the agent is still blocked on that prompt, instead of showing
+  the same buttons again; a second tap used to be refused as "a different
+  response was already submitted". A prompt that stays open offers "Answer
+  again" and points to the terminal.
+- The relay sends approval keys one write at a time, as it already did for
+  structured questions, so a navigation key and Enter never share an input
+  chunk.
+
 ## [0.20.5] - 2026-09-02
 
 ### Fixed

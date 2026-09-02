@@ -103,9 +103,13 @@ func (d *Dispatcher) handleApproval(ctx context.Context, receivedAt time.Time, r
 		if stale := d.paneSessionCurrent(token, requestID, "approval"); stale != nil {
 			return EffectResult{Result: stale}
 		}
-		if err := d.herdrFor(paneID).SendKeys(
+		// One key per write, paced like the question path: a navigation key
+		// and Enter arriving in the same input chunk is exactly the case an
+		// agent's TUI may drop, and a dropped Enter leaves the prompt open.
+		if err := d.sendQuestionKeysForSession(
 			effectCtx,
-			rawID(paneID),
+			token,
+			paneID,
 			approvalKeys(payload.Index, classification.ApprovalFocus),
 		); err != nil {
 			return EffectResult{Result: d.failErr(requestID, "approval", paneID, err)}

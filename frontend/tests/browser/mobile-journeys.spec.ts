@@ -5712,3 +5712,35 @@ test('inserts a slash command from the conversation picker', async ({ page }) =>
     return sent?.text?.trim();
   }).toBe('/plan');
 });
+
+test('keeps a sent answer visible while the agent is still blocked on it', async ({ page }) => {
+  await boot(page, [fedora]);
+  await expect.poll(() => socketCount(page)).toBe(1);
+  await handshake(page, 0, {
+    capabilities: ['attention_classification', 'structured_questions', 'conversation_history'],
+  });
+  await setConversationFixture(page, { entries: [], total: 0 });
+  const blocked = {
+    pane_id: 'w1:p1', status: 'blocked', project: 'Mobile app', agent: 'claude',
+    session: 'abc', conversation_history_available: true,
+    attention_kind: 'approval', attention_capable: true, event_id: 'evt-1',
+    prompt: 'Run rm -rf dist?', options: ['Approve once', 'Deny'],
+  };
+  await server(page, 0, { type: 'agents', agents: [blocked] });
+  await page.getByRole('button', { name: 'Open Mobile app on Fedora' }).click();
+
+  const answer = page.locator('.conversation-answer');
+  await answer.getByRole('button', { name: 'Approve once' }).click();
+  await expect.poll(async () => (await commands(page)).filter((command) => command.type === 'respond').length).toBe(1);
+
+  // The relay re-pushes the same blocked prompt before the agent moves on
+  // (a single-agent update clears the generic waiting flag): the buttons
+  // must not come back, or a second tap collides with the first.
+  await server(page, 0, { type: 'agent_update', ...blocked, pane_revision: 2 });
+  await expect(answer).toContainText('Answered “Approve once”');
+  await expect(answer.getByRole('button', { name: 'Approve once' })).toBeHidden();
+
+  // A new prompt is a new decision.
+  await server(page, 0, { type: 'agent_update', ...blocked, event_id: 'evt-2', prompt: 'Run tests?', pane_revision: 3 });
+  await expect(answer.getByRole('button', { name: 'Approve once' })).toBeVisible();
+});

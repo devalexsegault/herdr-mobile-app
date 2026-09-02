@@ -299,6 +299,7 @@ class RelayStore {
   private slashCommandCache = new Map<string, SlashCommandCacheEntry>();
   private pendingSlashCommands = new Map<string, PendingSlashCommands>();
   private respondingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private respondingEvents = new Map<string, string>();
   private reconnectAttempts = new Map<string, number>();
   private reconnectEnabled = true;
   private keepaliveTimer: ReturnType<typeof setInterval> | null = null;
@@ -1140,13 +1141,23 @@ class RelayStore {
   }
 
   private reconcileResponding(): void {
-    const blocked = new Set(this.agentsValue.filter((agent) => agentStatusGroup(agent) === 'blocked').map((agent) => agent.pane_id));
+    const blockedAgents = new Map(this.agentsValue
+      .filter((agent) => agentStatusGroup(agent) === 'blocked')
+      .map((agent) => [agent.pane_id, agent] as const));
+    const blocked = new Set(blockedAgents.keys());
+    // A new blocked event on the same pane is a new decision: the answer sent
+    // for the previous one is no longer what the person is waiting on.
+    for (const [paneId, eventId] of this.respondingEvents) {
+      const current = String(blockedAgents.get(paneId)?.event_id || '');
+      if (eventId && current && current !== eventId) blocked.delete(paneId);
+    }
     let changed = false;
     for (const paneId of this.respondingValue) {
       if (!blocked.has(paneId)) {
         const timer = this.respondingTimers.get(paneId);
         if (timer) clearTimeout(timer);
         this.respondingTimers.delete(paneId);
+        this.respondingEvents.delete(paneId);
         this.respondingValue.delete(paneId);
         changed = true;
       }
@@ -1172,6 +1183,7 @@ class RelayStore {
     const timer = this.respondingTimers.get(paneId);
     if (timer) clearTimeout(timer);
     this.respondingTimers.delete(paneId);
+    this.respondingEvents.delete(paneId);
     this.respondingValue.delete(paneId);
     this.responding.set(new Set(this.respondingValue));
   }
@@ -1786,6 +1798,7 @@ class RelayStore {
     if (index < 0) return false;
     const label = choice || approvalOptions(agent)[index] || `option ${index + 1}`;
     this.markResponding(agent.pane_id);
+    this.respondingEvents.set(agent.pane_id, String(agent.event_id || ''));
     try {
       const result = await this.sendToAgent(agent, {
         type: 'respond', index, total, choice: label, source, event_id: agent.event_id || '',

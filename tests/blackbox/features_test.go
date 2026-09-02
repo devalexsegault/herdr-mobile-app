@@ -516,10 +516,52 @@ func TestCapturedQoderAttentionFlowsThroughRelay(t *testing.T) {
 	if result["ok"] != true || result["phase"] != "accepted" {
 		t.Fatalf("approval result = %+v", result)
 	}
-	wantKeys := []string{"pane", "send-keys", "approval-pane", "Up", "Up", "Enter"}
-	if got := findFakeOperation(t, env.operationsLog, "pane", "send-keys"); !reflect.DeepEqual(got, wantKeys) {
-		t.Fatalf("approval operation = %#v, want %#v", got, wantKeys)
+	// Keys are written one at a time so a navigation key and Enter never
+	// share an input chunk; the sequence itself is unchanged.
+	wantKeys := [][]string{
+		{"pane", "send-keys", "approval-pane", "Up"},
+		{"pane", "send-keys", "approval-pane", "Up"},
+		{"pane", "send-keys", "approval-pane", "Enter"},
 	}
+	if got := findFakeOperations(t, env.operationsLog, "pane", "send-keys"); !reflect.DeepEqual(got, wantKeys) {
+		t.Fatalf("approval operations = %#v, want %#v", got, wantKeys)
+	}
+}
+
+// findFakeOperations returns every recorded operation whose argv starts with
+// want, in the order the fake herdr received them.
+func findFakeOperations(t *testing.T, path string, want ...string) [][]string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var matches [][]string
+	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		if line == "" {
+			continue
+		}
+		var operation struct {
+			Argv []string `json:"argv"`
+		}
+		if err := json.Unmarshal([]byte(line), &operation); err != nil {
+			t.Fatalf("decode fake operation: %v", err)
+		}
+		if len(operation.Argv) < len(want) {
+			continue
+		}
+		match := true
+		for index := range want {
+			if operation.Argv[index] != want[index] {
+				match = false
+				break
+			}
+		}
+		if match {
+			matches = append(matches, operation.Argv)
+		}
+	}
+	return matches
 }
 
 func readAttentionCapture(t *testing.T, name string) string {

@@ -69,6 +69,31 @@
   const interaction = $derived(questionInteraction(agent));
   const options = $derived(approvalOptions(agent));
   const answerable = $derived(agentNeedsResponse(agent) && Boolean(interaction || options.length));
+  // Remember the answer sent for the current blocked event. The agents feed
+  // clears the generic "responding" flag on its next push even when the pane
+  // is still blocked on the same prompt, and showing the same buttons again
+  // reads as "nothing happened": a second tap then collides with the first.
+  let answered = $state<{ eventId: string; choice: string; at: number } | null>(null);
+  let answeredNow = $state(Date.now());
+  const answeredCurrent = $derived(Boolean(answered)
+    && agentNeedsResponse(agent)
+    && String(agent.event_id || '') === answered?.eventId);
+  const answerStalled = $derived(answeredCurrent && answeredNow - (answered?.at || 0) > 8_000);
+  $effect(() => {
+    if (!answeredCurrent) {
+      if (answered) answered = null;
+      return;
+    }
+    const timer = setInterval(() => { answeredNow = Date.now(); }, 1_000);
+    return () => clearInterval(timer);
+  });
+
+  async function answerApproval(index: number, option: string) {
+    const eventId = String(agent.event_id || '');
+    const ok = await relayStore.respond(agent, index, options.length, option);
+    if (ok) answered = { eventId, choice: option, at: Date.now() };
+  }
+
   const inputPlaceholder = $derived(answerable
     ? 'Answer above to continue'
     : agentNeedsResponse(agent)
@@ -466,14 +491,26 @@
           <QuestionForm {agent} {interaction} responding={$responding.has(agent.pane_id)} />
         {:else}
           <p class="conversation-answer-prompt">{approvalPromptPreview(agent)}</p>
-          {#if $responding.has(agent.pane_id)}
+          {#if answeredCurrent}
+            <p class="conversation-composer-status" role="status">
+              Answered “{answered?.choice}”. Waiting for the agent to move on…
+            </p>
+            {#if answerStalled}
+              <p class="conversation-composer-status">
+                The agent has not reacted yet. Check it in Terminal, or answer again.
+              </p>
+              <div class="conversation-answer-actions">
+                <Button variant="secondary" size="sm" onclick={() => { answered = null; }}>Answer again</Button>
+              </div>
+            {/if}
+          {:else if $responding.has(agent.pane_id)}
             <p class="conversation-composer-status" role="status">Waiting for agent…</p>
           {:else}
             <div class="conversation-answer-actions">
               {#each options as option, index (`${index}:${option}`)}
                 <Button
                   variant={approvalButtonTone(option, index, options.length) === 'deny' ? 'danger' : approvalButtonTone(option, index, options.length) === 'trust' ? 'trust' : 'default'}
-                  onclick={() => { void relayStore.respond(agent, index, options.length, option); }}
+                  onclick={() => { void answerApproval(index, option); }}
                 >{option.length > 48 ? `${option.slice(0, 45)}...` : option}</Button>
               {/each}
             </div>

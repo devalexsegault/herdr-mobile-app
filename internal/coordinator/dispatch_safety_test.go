@@ -183,11 +183,13 @@ func TestApprovalDispatchNavigatesFromReparsedLiveFocus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(
-		string(data),
-		"pane send-keys pane-1 Up Up Enter",
-	) {
-		t.Fatalf("focus-aware approval keys were not dispatched:\n%s", data)
+	// Keys go out one write at a time, so a navigation key and Enter never
+	// share an input chunk; the order must still be Up, Up, then Enter.
+	ups := strings.Count(string(data), "pane send-keys pane-1 Up\n")
+	enter := strings.LastIndex(string(data), "pane send-keys pane-1 Enter")
+	lastUp := strings.LastIndex(string(data), "pane send-keys pane-1 Up\n")
+	if ups != 2 || enter < 0 || enter < lastUp {
+		t.Fatalf("focus-aware approval keys were not dispatched one at a time:\n%s", data)
 	}
 	if strings.Contains(string(data), "Escape") {
 		t.Fatalf("approval dispatch assumed Escape selected the last row:\n%s", data)
