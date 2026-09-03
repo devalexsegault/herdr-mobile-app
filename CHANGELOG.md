@@ -3,7 +3,7 @@
 Notable user-facing changes to Herdr Mobile Relay are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.20.9] - 2026-09-03
 
 ### Added
 
