@@ -1,0 +1,8 @@
+{
+  "type": "board_template_brief",
+  "request_id": "req-board-template-brief",
+  "protocol": 2,
+  "kind": "design",
+  "name": "Docs sprint",
+  "intent": "Write and review documentation for a feature"
+}

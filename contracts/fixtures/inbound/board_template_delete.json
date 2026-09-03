@@ -1,0 +1,6 @@
+{
+  "type": "board_template_delete",
+  "request_id": "req-board-template-delete",
+  "protocol": 2,
+  "name": "Review pipeline"
+}

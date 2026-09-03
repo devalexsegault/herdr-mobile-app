@@ -96,6 +96,7 @@ type Server struct {
 	updateM          *relayupdate.Manager
 	appDeployM       *appdeploy.Manager
 	boardM           *boardBridge
+	boardT           *boardTemplates
 	// Overridden in tests; production reads Herdr's own integration status.
 	herdrIntegrations func(context.Context) []herdrIntegration
 	hybrid            *hybridTransport
@@ -182,7 +183,9 @@ func New(cfg *config.Config, version, revision string, logger *slog.Logger) *Ser
 		historyLast:         make(map[string]time.Time),
 		historyActive:       make(map[string]bool),
 	}
-	server.boardM = newBoardBridge(board.New(cfg.BoardSocketPath, logger), hub, logger)
+	boardClient := board.New(cfg.BoardSocketPath, logger)
+	server.boardM = newBoardBridge(boardClient, hub, logger)
+	server.boardT = newBoardTemplates(filepath.Join(cfg.RuntimeDir, "board-templates"), boardClient, hub, logger)
 	return server
 }
 
@@ -292,7 +295,7 @@ func (s *Server) Run(ctx context.Context) error {
 		integrations := s.integrations(client.Context())
 		boardDescriptor := s.boardM.descriptor(client.Context())
 		if boardDescriptor != nil {
-			capabilities = append(capabilities, protocol.BoardCapability)
+			capabilities = append(capabilities, protocol.BoardCapability, protocol.BoardTemplatesCapability)
 		}
 		s.hub.Send(client, protocol.PushConfig{
 			Type:           "push_config",
@@ -707,6 +710,26 @@ func (s *Server) Run(ctx context.Context) error {
 			s.boardM.subscribe(ctx, client.ID())
 		case "board_unsubscribe":
 			s.boardM.unsubscribe(client.ID())
+		case "board_template_list", "board_template_get", "board_template_save", "board_template_delete",
+			"board_template_export", "board_template_apply", "board_template_brief":
+			// Writes to the relay's template files and column rewrites are
+			// audited like every other remote write; listing and reading are
+			// not, for the same reason board reads are not.
+			if protocol.RequiresProtocol(inbound.Type) {
+				s.recordWriteAudit(client, msg, nil)
+			}
+			s.boardT.handle(commandCtx, client.ID(), templateRequest{
+				Type:        inbound.Type,
+				RequestID:   inbound.RequestID,
+				Name:        inbound.Name,
+				Description: inbound.Description,
+				Template:    inbound.Template,
+				BoardID:     inbound.BoardID,
+				Mode:        inbound.Mode,
+				Kind:        inbound.Kind,
+				Intent:      inbound.Intent,
+				Save:        inbound.Save,
+			})
 		case "refresh_agents":
 			inventory := s.committedInventoryStatus()
 			s.hub.Send(client, map[string]any{

@@ -1,0 +1,26 @@
+{
+  "type": "board_template_save",
+  "request_id": "req-board-template-save",
+  "protocol": 2,
+  "template": {
+    "name": "Review pipeline",
+    "description": "Execute then review",
+    "columns": [
+      { "name": "Backlog", "trigger": "manual" },
+      {
+        "name": "Execute",
+        "trigger": "auto",
+        "system_prompt": "Do the work described by the card.",
+        "harness": "claude",
+        "model": "sonnet",
+        "effort": "medium",
+        "permission": "acceptEdits",
+        "timeout_minutes": 60,
+        "fresh_session": true,
+        "on_success": "Done",
+        "on_fail": "Backlog"
+      },
+      { "name": "Done", "trigger": "manual" }
+    ]
+  }
+}

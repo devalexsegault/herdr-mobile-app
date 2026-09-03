@@ -53,6 +53,12 @@ var mutatingTypes = map[string]bool{
 	// check rather than trying to classify the inner method here.
 	"board_rpc":         true,
 	"release_pane_size": true,
+	// Template writes touch the relay's own files, and apply rewrites a
+	// board's columns; the AI brief creates the templates directory.
+	"board_template_save":   true,
+	"board_template_delete": true,
+	"board_template_apply":  true,
+	"board_template_brief":  true,
 }
 
 type Inbound struct {
@@ -111,6 +117,16 @@ type Inbound struct {
 	// directly instead of waiting for the relay to mirror each method.
 	Method string          `json:"method,omitempty"`
 	Params json.RawMessage `json:"params,omitempty"`
+	// Board templates: a whole template for save, a board id for export and
+	// apply, a mode (replace|append) for apply, and a kind (design|edit) with
+	// a one-line intent for the AI brief.
+	Template    json.RawMessage `json:"template,omitempty"`
+	BoardID     int64           `json:"board_id,omitempty"`
+	Mode        string          `json:"mode,omitempty"`
+	Kind        string          `json:"kind,omitempty"`
+	Intent      string          `json:"intent,omitempty"`
+	Description string          `json:"description,omitempty"`
+	Save        bool            `json:"save,omitempty"`
 }
 
 func DecodeMap(raw map[string]any) (Inbound, error) {
@@ -245,6 +261,10 @@ const AgentResponseCopyCapability = "agent_response_copy"
 // is advertised per connection, from a live probe, because the board plugin can
 // be installed, removed or stopped without the relay restarting.
 const BoardCapability = "board_v1"
+
+// BoardTemplatesCapability tells the app this relay stores board templates
+// and can replay them onto boards or brief an agent to design one.
+const BoardTemplatesCapability = "board_templates_v1"
 
 var Capabilities = []string{
 	"attention_classification",

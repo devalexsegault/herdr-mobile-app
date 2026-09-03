@@ -1,0 +1,8 @@
+{
+  "type": "board_template_apply",
+  "request_id": "req-board-template-apply",
+  "protocol": 2,
+  "name": "Review pipeline",
+  "board_id": 3,
+  "mode": "replace"
+}
