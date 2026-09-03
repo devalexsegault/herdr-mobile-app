@@ -8,6 +8,7 @@
   id="unlock-dialog"
   open={$securityState.locked}
   dismissible={false}
+  presentation="center"
   title="Unlock Herdr"
   description={$securityState.reason === 'resume'
     ? 'Verify to pick up where you left off.'

@@ -8,6 +8,7 @@
     description = '',
     children,
     dismissible = true,
+    presentation = 'sheet',
   }: {
     id: string;
     open?: boolean;
@@ -15,6 +16,8 @@
     description?: string;
     children?: Snippet;
     dismissible?: boolean;
+    /** A bottom sheet on phones (the default), or a centred card for gates. */
+    presentation?: 'sheet' | 'center';
   } = $props();
 
   let dialog = $state<HTMLDialogElement>();
@@ -47,6 +50,7 @@
     bind:this={dialog}
     {id}
     class="app-dialog"
+    class:sheet={presentation === 'sheet'}
     aria-labelledby={`${id}-title`}
     aria-describedby={description ? `${id}-description` : undefined}
     oncancel={cancel}
@@ -54,6 +58,7 @@
     onclick={dismissFromBackdrop}
   >
     <div class="dialog-content">
+      {#if presentation === 'sheet'}<span class="sheet-grabber" aria-hidden="true"></span>{/if}
       <h2 class="dialog-title" id={`${id}-title`}>{title}</h2>
       {#if description}<p class="dialog-description" id={`${id}-description`}>{description}</p>{/if}
       {@render children?.()}

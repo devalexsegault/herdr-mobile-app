@@ -319,6 +319,7 @@
     ? `${completedItems} of ${totalItems} update items complete for v${$plan.targetVersion}.`
     : ''}
   dismissible={false}
+  presentation="center"
 >
   {#if $plan}
     <section class="update-progress" aria-live="polite">

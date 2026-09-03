@@ -13,6 +13,7 @@
   import LaunchView from '$components/LaunchView.svelte';
   import GlobalJump from '$components/GlobalJump.svelte';
   import LockScreen from '$components/LockScreen.svelte';
+  import AgentSheet from '$components/AgentSheet.svelte';
   import ManageDialog from '$components/ManageDialog.svelte';
   import SettingsView from '$components/SettingsView.svelte';
   import TerminalView from '$components/TerminalView.svelte';
@@ -73,6 +74,13 @@
   const appUpdates = appUpdateStatus;
 
   let manageOpen = $state(false);
+  let agentSheetOpen = $state(false);
+  let sheetAgent = $state<Agent | null>(null);
+  function openAgentSheet(agent: Agent | null) {
+    if (!agent) return;
+    sheetAgent = agent;
+    agentSheetOpen = true;
+  }
   // Bound so the header's Find control can open the terminal's own find bar.
   let terminalView = $state<{ openFind: () => void } | null>(null);
   let jumpOpen = $state(false);
@@ -283,6 +291,42 @@
         void reloadUpdatedSameOriginApp(pending.version);
       }
     }
+  });
+
+  // Large titles: the compact bar's title only shows once the page has
+  // scrolled past the large one, like a native navigation bar.
+  let scrolled = $state(false);
+  $effect(() => {
+    const update = () => { scrolled = window.scrollY > 28; };
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    return () => window.removeEventListener('scroll', update);
+  });
+
+  // Edge swipe back: a drag that starts on the left edge and travels right
+  // closes the current view, the way a pushed screen pops.
+  $effect(() => {
+    let startX = -1;
+    let startY = 0;
+    const start = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      startX = touch && touch.clientX <= 24 ? touch.clientX : -1;
+      startY = touch?.clientY ?? 0;
+    };
+    const end = (event: TouchEvent) => {
+      if (startX < 0) return;
+      const touch = event.changedTouches[0];
+      const dx = (touch?.clientX ?? 0) - startX;
+      const dy = Math.abs((touch?.clientY ?? 0) - startY);
+      startX = -1;
+      if (dx > 90 && dy < 60 && !tabForView($currentView)) closeCurrentView();
+    };
+    window.addEventListener('touchstart', start, { passive: true });
+    window.addEventListener('touchend', end, { passive: true });
+    return () => {
+      window.removeEventListener('touchstart', start);
+      window.removeEventListener('touchend', end);
+    };
   });
 
   $effect(() => {
@@ -497,10 +541,17 @@
       role="img"
       aria-label={headerIndicator.label}
     ></span>
-    <div class="header-title">
-      <h1>{headerTitle}</h1>
-      {#if headerMeta}<span>{headerMeta}</span>{/if}
-    </div>
+    {#if agentView && activeAgent}
+      <button type="button" class="header-title header-title-button" aria-label="Agent details" onclick={() => openAgentSheet(activeAgent)}>
+        <h1>{headerTitle}</h1>
+        {#if headerMeta}<span>{headerMeta}</span>{/if}
+      </button>
+    {:else}
+      <div class="header-title" class:compact-hidden={activeTab !== null && !scrolled}>
+        <h1>{headerTitle}</h1>
+        {#if headerMeta}<span>{headerMeta}</span>{/if}
+      </div>
+    {/if}
     {#if activeTab === 'today'}<span class="agent-count">{headerSummary}</span>{/if}
     <nav aria-label="Application">
       {#if agentView}
@@ -522,6 +573,11 @@
         </div>
         <Button variant="ghost" size="icon" aria-label="Manage agent" disabled={!activeAgent} onclick={() => { manageOpen = true; }}>•••</Button>
       {:else if activeTab || $currentView.view === 'agents_all'}
+        {#if activeTab === 'today'}
+        <Button variant="ghost" size="icon" aria-label="Start an agent" title="Start an agent" onclick={() => navigate({ view: 'launch' })}>
+          <svg class="header-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"></path></svg>
+        </Button>
+        {/if}
         {#if activeTab}
         <Button class="global-jump-button" variant="ghost" size="icon" aria-label="Search all agents" title="Search all agents" onclick={() => { jumpOpen = true; }}>
           <svg class="header-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
@@ -537,20 +593,15 @@
             </svg>
           </Button>
         {/if}
-        {#if activeTab || $currentView.view === 'agents_all'}
-          <span class="nav-button-shell">
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={settingsLabel}
-              onclick={() => toggle('settings')}
-            >⚙</Button>
-            {#if updateAvailable}<span class="nav-update-badge" aria-hidden="true"></span>{/if}
-          </span>
-        {/if}
       {/if}
     </nav>
   </header>
+  {#if activeTab}
+    <div class="large-title-block" aria-hidden="true">
+      <span class="large-title">{headerTitle}</span>
+      {#if headerMeta}<span class="large-title-meta">{headerMeta}</span>{/if}
+    </div>
+  {/if}
 
   {#if $currentView.view === 'settings'}
     <SettingsView />
@@ -614,6 +665,7 @@
       connections={$connections}
       responding={$responding}
       onopen={openAgent}
+      onsheet={openAgentSheet}
       onbrowse={() => navigate({ view: 'agents_all' })}
     />
   {/if}
@@ -626,11 +678,12 @@
         </svg>
       </button>
     {/if}
-    <TabBar attention={waitingCount} />
+    <TabBar attention={waitingCount} {settingsLabel} updateBadge={updateAvailable} />
   {/if}
 </div>
 
 <UpdateProgressDialog />
+<AgentSheet bind:open={agentSheetOpen} agent={sheetAgent} />
 <ManageDialog
   bind:open={manageOpen}
   agent={activeAgent}

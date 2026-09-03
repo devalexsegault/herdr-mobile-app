@@ -41,6 +41,13 @@ setup and want to know what every screen and control is for.
 
 ## Getting around
 
+The app is built like a native phone app: five tabs at the bottom (Today,
+Agents, Board, Activity, Settings), large titles that collapse into the bar as
+you scroll, pickers as bottom sheets, and an edge swipe from the left that goes
+back. Tap the title of an agent's conversation, or long-press a row on Today,
+to open the agent sheet: rename it (the Herdr tab on the computer follows),
+open its terminal, or stop it.
+
 The app has three sections, on a bottom tab bar:
 
 - **Today** — what needs you first, across every project on the relay, then

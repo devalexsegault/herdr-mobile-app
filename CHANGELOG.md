@@ -3,6 +3,24 @@
 Notable user-facing changes to Herdr Mobile Relay are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
+## [0.20.10] - 2026-09-03
+
+### Changed
+
+- The app now behaves like a native phone app: a five-tab bar (Today,
+  Agents, Board, Activity, Settings) over the home-indicator safe area, large
+  titles that collapse into the compact bar on scroll, every picker as a
+  bottom sheet with a grabber, inset-grouped lists on Today and in Settings,
+  an edge swipe that goes back, and a board that pages one column per swipe.
+  Settings moved from the header to its tab, taking its update badge along.
+
+### Added
+
+- Agents can be renamed from the app: tap the title in the conversation or
+  long-press a row on Today to open the agent sheet, which also opens the
+  terminal or stops the agent.
+- A "+" in the Today header starts an agent.
+
 ## [0.20.9] - 2026-09-03
 
 ### Added

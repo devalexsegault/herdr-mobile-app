@@ -6,7 +6,7 @@ import type { NotificationTarget } from './types';
 // The three roots of the tab bar. Everything else is a view pushed over the
 // tab it was opened from: a terminal, a card, a launch form, settings. Only the
 // roots show the bar, so a pushed view keeps the whole screen.
-export type TabId = 'today' | 'board' | 'activity';
+export type TabId = 'today' | 'agents' | 'board' | 'activity' | 'settings';
 
 export type ViewState =
   | { view: 'agents' }
@@ -31,8 +31,10 @@ export const currentView = writable<ViewState>({ view: 'agents' });
 
 const tabRoots: Record<TabId, ViewState> = {
   today: { view: 'agents' },
+  agents: { view: 'agents_all' },
   board: { view: 'board' },
   activity: { view: 'activity' },
+  settings: { view: 'settings' },
 };
 
 // A view either IS a tab root or sits above one. Returning null is what hides
@@ -40,8 +42,10 @@ const tabRoots: Record<TabId, ViewState> = {
 // the bottom of the phone with the keyboard and the composer.
 export function tabForView(state: ViewState): TabId | null {
   if (state.view === 'agents') return 'today';
+  if (state.view === 'agents_all') return 'agents';
   if (state.view === 'board') return 'board';
   if (state.view === 'activity') return 'activity';
+  if (state.view === 'settings') return 'settings';
   return null;
 }
 

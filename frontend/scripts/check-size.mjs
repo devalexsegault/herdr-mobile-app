@@ -50,7 +50,11 @@ import { constants, gzipSync } from 'node:zlib';
 // Raised from 142 KiB for board templates: the Templates tab, the template
 // editor, the apply and AI-design dialogs and their relay calls add 6,110 B
 // gzip to the 0.20.8 bundle, which had no headroom left under 142 KiB.
-const limitKiB = 149;
+// Raised from 149 KiB for the native shell (0.20.10): the five-tab bar, the
+// collapsing large title, bottom-sheet dialogs, inset-grouped lists, the
+// agent sheet with rename and the edge-swipe handler add 1,706 B gzip over
+// the 0.20.9 bundle, which sat exactly at the ceiling.
+const limitKiB = 152;
 const limit = limitKiB * 1024;
 const root = resolve(process.argv[2] || 'dist');
 const files = ['index.html', 'assets/app.js', 'assets/app.css'];

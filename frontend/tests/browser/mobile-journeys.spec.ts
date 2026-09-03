@@ -664,7 +664,8 @@ test('defaults to the mixed workspace layout and separates state sections on dem
   // By State: sections separated by state, done first after the input queue.
   await page.getByRole('button', { name: /Settings/ }).click();
   await page.getByRole('button', { name: 'By State' }).click();
-  await page.getByRole('button', { name: 'Back' }).click();
+  // Settings is a tab: the way back to Today is its tab.
+  await page.getByRole('button', { name: 'Agents', exact: true }).click();
   const done = page.locator('.done-section');
   await expect(done.getByRole('heading', { name: 'Done' })).toBeVisible();
   await expect(done.locator('summary strong')).toHaveText(['alpha']);
@@ -678,7 +679,8 @@ test('defaults to the mixed workspace layout and separates state sections on dem
   // Back to the mixed default.
   await page.getByRole('button', { name: /Settings/ }).click();
   await page.getByRole('button', { name: 'Mixed' }).click();
-  await page.getByRole('button', { name: 'Back' }).click();
+  // Settings is a tab: the way back to Today is its tab.
+  await page.getByRole('button', { name: 'Agents', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Done' })).toBeHidden();
   await expect(page.getByRole('region', { name: 'Workspaces' })).toBeVisible();
 });
@@ -875,7 +877,9 @@ test('imports quick setup and merges agents from multiple relays', async ({ page
   await server(page, base + 1, { type: 'agents', agents: [{ pane_id: 'w1:p1', status: 'blocked', attention_kind: 'approval', project: 'Mac app', agent: 'claude', options: ['Approve once', 'Deny'] }] });
   const headerBox = await page.getByRole('banner').boundingBox();
   const connectionBox = await page.getByRole('img', { name: /relays connected/ }).boundingBox();
-  const settingsBox = await page.getByRole('button', { name: 'Settings' }).boundingBox();
+  // Settings lives in the tab bar now; the header's trailing control is
+  // whatever its nav ends with.
+  const settingsBox = await page.getByRole('banner').locator('nav button').last().boundingBox();
   expect(headerBox && connectionBox && settingsBox).toBeTruthy();
   const leadingInset = connectionBox!.x + connectionBox!.width / 2 - headerBox!.x;
   const trailingInset = headerBox!.x + headerBox!.width - settingsBox!.x - settingsBox!.width / 2;
@@ -978,7 +982,8 @@ test('reconnects and blocks mutations for an incompatible relay protocol', async
   await expect(removeDialog).toContainText('You will need its setup link or connection details to add it again.');
   await removeDialog.getByRole('button', { name: 'Cancel' }).click();
   await expect(page.getByText('wss://fedora.example')).toBeVisible();
-  await page.getByRole('button', { name: 'Back' }).click();
+  // Settings is a tab: the way back to Today is its tab.
+  await page.getByRole('button', { name: 'Today', exact: true }).click();
   await page.getByRole('button', { name: 'Approve once' }).click();
   await expect(page.getByRole('status').filter({ hasText: /protocol v1/ })).toBeVisible();
   expect((await commands(page)).filter((command) => command.type === 'respond')).toHaveLength(0);
@@ -4077,7 +4082,8 @@ test('scales the whole interface from accessible settings', async ({ page }) => 
     type: 'agents',
     agents: [{ pane_id: 'w1:p1', status: 'idle', project: 'History app', agent: 'codex' }],
   });
-  await page.getByRole('button', { name: 'Back' }).click();
+  // Settings is a tab: the way back to Today is its tab.
+  await page.getByRole('button', { name: 'Today', exact: true }).click();
   await page.getByRole('button', { name: 'Open History app on Fedora' }).click();
   await expect.poll(async () => (await commands(page))
     .some((command) => command.type === 'read_pane' && command.lines === 500)).toBe(true);
@@ -4119,7 +4125,8 @@ test('scales and expands the prompt composer for multiline text', async ({ page 
     await page.getByRole('button', { name: /Settings/ }).click();
   };
   const backToAgent = async () => {
-    await page.getByRole('button', { name: 'Back' }).click();
+    // Settings is a tab: the way back to Today is its tab.
+    await page.getByRole('button', { name: 'Today', exact: true }).click();
     await page.getByRole('button', { name: 'Open Composer app on Fedora' }).click();
   };
 
@@ -5922,4 +5929,38 @@ test('starts an agent to design a template and opens its conversation', async ({
     }],
   });
   await expect(page.getByRole('heading', { name: 'Conversation', exact: true })).toBeVisible();
+});
+
+test('renames an agent from the sheet behind its title', async ({ page }) => {
+  await boot(page, [fedora]);
+  await expect.poll(() => socketCount(page)).toBe(1);
+  await handshake(page, 0, {
+    capabilities: ['attention_classification', 'structured_questions', 'conversation_history'],
+  });
+  await setConversationFixture(page, { entries: [], total: 0 });
+  await server(page, 0, {
+    type: 'agents',
+    agents: [{
+      pane_id: 'w1:p1', status: 'idle', project: 'Rename app', agent: 'claude', tab_label: 'Sitemap',
+      session: 'abc', conversation_history_available: true,
+    }],
+  });
+
+  // Five tabs, Settings among them, and the Today row named by its tab.
+  const tabs = page.getByRole('navigation', { name: 'Sections' });
+  await expect(tabs.getByRole('button')).toHaveCount(5);
+  await expect(page.locator('.agent-row-title')).toContainText('Sitemap');
+
+  await page.getByRole('button', { name: 'Open Rename app on Fedora' }).click();
+  await page.locator('.mode-switch').getByRole('button', { name: 'Chat' }).click();
+  await page.getByRole('button', { name: 'Agent details' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Agent' });
+  const name = sheet.getByRole('textbox', { name: 'Name' });
+  await expect(name).toHaveValue('Sitemap');
+  await expect(sheet.getByRole('button', { name: 'Save' })).toBeDisabled();
+  await name.fill('Sitemap v2');
+  await sheet.getByRole('button', { name: 'Save' }).click();
+  await expect.poll(async () => (await commands(page)).find((command) => command.type === 'agent_rename'))
+    .toMatchObject({ pane_id: 'w1:p1', name: 'Sitemap v2' });
+  await expect(sheet).toBeHidden();
 });

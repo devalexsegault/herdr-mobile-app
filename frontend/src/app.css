@@ -1306,3 +1306,81 @@ textarea { min-height: 6.5rem; resize: vertical; }
 /* A workspace that lives in another Herdr session says so next to its name;
    the base session needs no label, it is where everything was before. */
 .session-chip { align-self: flex-start; background: color-mix(in srgb, var(--trust) 16%, var(--card)); border: 1px solid color-mix(in srgb, var(--trust) 40%, var(--border)); border-radius: .4rem; color: var(--trust); font-size: .64rem; font-weight: 650; margin-left: .4rem; padding: .08rem .4rem; vertical-align: middle; }
+
+/* ------------------------------------------------------------------------
+   Native mobile shell (0.20.10): five-tab bar over the home-indicator safe
+   area, a large title that collapses into the compact bar on scroll, bottom
+   sheets for every picker, inset-grouped lists, and a board that pages one
+   column per swipe. Values follow the design canvas; the tokens are the
+   app's own.
+   ------------------------------------------------------------------------ */
+:root { --tab-bar-height: 3.05rem; }
+.tab-bar { grid-template-columns: repeat(5, 1fr); background: color-mix(in srgb, var(--card) 92%, transparent); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); padding: .25rem .25rem calc(env(safe-area-inset-bottom) + .15rem); }
+.tab-bar-item { gap: .18rem; min-height: var(--tab-bar-height); padding: .3rem 0; }
+.tab-bar-item:active { transform: scale(.94); transition: transform .08s ease; }
+.tab-bar-icon { height: 1.5rem; width: 1.5rem; }
+.tab-bar-label { font-size: .625rem; }
+.app-shell.tabbed { padding-bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom) + 1rem); }
+
+/* Compact bar: the title fades in only once the large one has scrolled away. */
+.header-title.compact-hidden { opacity: 0; pointer-events: none; }
+.header-title { transition: opacity .18s ease; }
+.large-title-block { display: flex; flex-direction: column; gap: .15rem; margin: 0 auto; max-width: 48rem; padding: .35rem 1.15rem 0; }
+.large-title { font-size: 2.125rem; font-weight: 700; letter-spacing: -.025em; line-height: 1.2; }
+.large-title-meta { color: var(--muted); font-size: .8rem; font-weight: 550; }
+
+/* Bottom sheet: grabber, rounded top, slides up, safe-area bottom padding. */
+.app-dialog.sheet { align-items: flex-end; display: flex; justify-content: center; }
+.app-dialog.sheet .dialog-content { animation: sheet-rise .22s cubic-bezier(.2,.8,.2,1); border-radius: 1.35rem 1.35rem 0 0; border-width: 1px 0 0; bottom: 0; box-shadow: 0 -.75rem 2.5rem rgb(0 0 0 / .45); left: 0; max-height: calc(100dvh - 3rem - env(safe-area-inset-top)); max-width: 100%; padding: .6rem 1.1rem calc(1.1rem + env(safe-area-inset-bottom)); position: fixed; top: auto; transform: none; width: 100%; }
+@media (min-width: 48rem) { .app-dialog.sheet .dialog-content { border-radius: 1.35rem; bottom: 2rem; left: 50%; max-width: 30rem; transform: translateX(-50%); } }
+.sheet-grabber { background: color-mix(in srgb, var(--muted) 45%, transparent); border-radius: 999px; display: block; height: 5px; margin: 0 auto .85rem; width: 36px; }
+@keyframes sheet-rise { from { opacity: .6; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+.app-dialog.sheet .dialog-title { font-size: 1.25rem; }
+.app-dialog.sheet .dialog-actions { padding-top: .35rem; }
+@media (prefers-reduced-motion: reduce) { .app-dialog.sheet .dialog-content { animation: none; } }
+
+/* Inset-grouped lists: Today's project groups and the Settings sections. */
+.project-group { background: var(--card); border: 1px solid var(--border); border-radius: .9rem; overflow: hidden; padding: 0; }
+.project-group-head { margin: 0; padding: .55rem .9rem .25rem; }
+.project-group-rule { display: none; }
+.project-group-name { text-transform: none; }
+.project-group .agent-row { border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent); min-height: 3.5rem; padding: .5rem .9rem; }
+.project-group .agent-row:first-of-type { border-top: 0; }
+.project-group .agent-row:active { background: var(--card-hover); }
+.agent-row-title { font-size: .95rem; }
+.agent-row-meta { font-size: .76rem; }
+.waiting-card { border-radius: 1rem; box-shadow: 0 1px 2px rgb(0 0 0 / .18); }
+.waiting-actions .button { min-height: 2.75rem; }
+.home-heading { font-size: .8rem; }
+.settings-page .card { border-radius: .9rem; padding: .35rem 1rem .9rem; }
+.settings-page .card > h3 { color: var(--muted); font-size: .7rem; font-weight: 650; letter-spacing: .05em; margin: .4rem 0 .6rem; text-transform: uppercase; }
+
+/* Board: one column per swipe with scroll snapping; the next one peeks. */
+.board-columns { scroll-snap-type: x mandatory; scroll-padding: 0 1rem; padding-bottom: .5rem; }
+.board-column { flex: 0 0 min(86vw, 22rem); scroll-snap-align: start; }
+.board-card { border-radius: .9rem; }
+.board-card:active { transform: scale(.985); }
+
+/* Pressed state for every big control, the way native buttons acknowledge a tap. */
+.button:active, .chip-button:active, .board-switch:active { opacity: .88; }
+
+/* Sent messages read as sent: primary bubble, right-aligned, time inside. */
+.conversation-entry.conversation-user { background: var(--primary); border-color: transparent; color: var(--primary-foreground); }
+.conversation-entry.conversation-user > header strong, .conversation-entry.conversation-user > header time, .conversation-entry.conversation-user > small { color: color-mix(in srgb, var(--primary-foreground) 70%, transparent); }
+.conversation-entry.conversation-user a { color: var(--primary-foreground); text-decoration: underline; }
+
+/* Agent sheet rows and the tappable title in the agent header. */
+.header-title-button { appearance: none; background: transparent; border: 0; color: inherit; cursor: pointer; font: inherit; padding: 0; text-align: left; }
+.header-title-button:active { opacity: .7; }
+.sheet-rows { background: var(--secondary); border-radius: .9rem; display: flex; flex-direction: column; overflow: hidden; }
+.sheet-row { align-items: center; display: flex; font-size: .88rem; gap: .75rem; justify-content: space-between; min-height: 2.9rem; padding: .4rem .9rem; }
+.sheet-row + .sheet-row, .sheet-action + .sheet-action { border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent); }
+.sheet-row span { color: var(--muted); flex: 0 0 auto; }
+.sheet-row strong { font-weight: 550; min-width: 0; overflow: hidden; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.sheet-path { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .78rem; }
+.sheet-action { appearance: none; background: transparent; border: 0; color: var(--foreground); cursor: pointer; font: inherit; font-size: .92rem; font-weight: 550; min-height: 2.9rem; padding: .5rem .9rem; text-align: left; width: 100%; }
+.sheet-action:active { background: var(--card-hover); }
+.sheet-action.danger { color: var(--danger); }
+.sheet-action:disabled { opacity: .6; }
+.hint { color: var(--muted); font-size: .74rem; margin: -.2rem 0 .2rem; }
+.tab-bar-update { background: var(--warning); border: 2px solid var(--card); border-radius: 50%; height: .62rem; position: absolute; right: -.2rem; top: -.15rem; width: .62rem; }
