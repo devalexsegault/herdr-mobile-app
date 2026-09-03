@@ -1,10 +1,12 @@
 <script lang="ts">
   import CardCompose from '$components/CardCompose.svelte';
+  import TemplatesView from '$components/TemplatesView.svelte';
   import AppDialog from '$components/ui/AppDialog.svelte';
   import Button from '$components/ui/Button.svelte';
-  import { createProject, getBoard, listProjects, selectBoard } from '$lib/board/client';
+  import { createProject, exportTemplate, getBoard, listProjects, selectBoard } from '$lib/board/client';
   import { cardStatusTone, runAge } from '$lib/board/format';
   import { boardSelection, selectBoardContext } from '$lib/board/selection';
+  import { editBoardWithAI } from '$lib/board/templates';
   import type { BoardCard, BoardSnapshot, ProjectEntry } from '$lib/board/types';
   import { navigate } from '$lib/router';
   import { relayStore } from '$lib/store';
@@ -149,6 +151,53 @@
     if (project.boards.length > 1) return `${project.project.name} · ${snapshot?.board.name}`;
     return project.project.name;
   });
+
+  // Templates live next to the board: reusable pipelines the relay keeps,
+  // independent of any project, and the agent-assisted ways to make them.
+  let section = $state<'board' | 'templates'>('board');
+  const templatesAvailable = $derived(Boolean(activeConnection?.capabilities.includes('board_templates_v1')));
+  let actionsOpen = $state(false);
+  let actionBusy = $state(false);
+  let actionError = $state('');
+  let saveName = $state('');
+  let editIntent = $state('');
+  const profiles = $derived(activeConnection?.agentProfiles || []);
+
+  function openActions() {
+    saveName = snapshot?.board.name && boardName !== snapshot.board.name ? boardName : (snapshot?.board.name || '');
+    editIntent = '';
+    actionError = '';
+    actionsOpen = true;
+  }
+
+  async function saveAsTemplate() {
+    if (!boardId || actionBusy) return;
+    actionBusy = true;
+    actionError = '';
+    try {
+      const exported = await exportTemplate(relayId, boardId, { name: saveName.trim() || undefined, save: true });
+      relayStore.showToast(`Saved ${exported.template.name} as a template.`);
+      actionsOpen = false;
+    } catch (failure) {
+      actionError = failure instanceof Error ? failure.message : 'The board could not be saved as a template';
+    } finally {
+      actionBusy = false;
+    }
+  }
+
+  async function editWithAI() {
+    if (!boardId || actionBusy) return;
+    actionBusy = true;
+    actionError = '';
+    try {
+      await editBoardWithAI(relayId, boardId, editIntent.trim(), profiles);
+      actionsOpen = false;
+    } catch (failure) {
+      actionError = failure instanceof Error ? failure.message : 'The editor could not be started';
+    } finally {
+      actionBusy = false;
+    }
+  }
 </script>
 
 <main class="board-view" aria-label="Board">
@@ -165,8 +214,19 @@
           <path d="m6 9 6 6 6-6"></path>
         </svg>
       </button>
-      {#if snapshot}
+      {#if snapshot && section === 'board'}
         <span class="board-bar-meta">{snapshot.cards.filter((card) => !card.archived_at).length} cards</span>
+      {/if}
+      {#if templatesAvailable}
+        <div class="board-bar-tools">
+          <div class="mode-switch" role="tablist" aria-label="Board section">
+            <button type="button" role="tab" class:active={section === 'board'} aria-selected={section === 'board'} onclick={() => { section = 'board'; }}>Board</button>
+            <button type="button" role="tab" class:active={section === 'templates'} aria-selected={section === 'templates'} onclick={() => { section = 'templates'; }}>Templates</button>
+          </div>
+          {#if section === 'board' && snapshot}
+            <Button size="sm" variant="ghost" aria-label="Board actions" onclick={openActions}>⋯</Button>
+          {/if}
+        </div>
       {/if}
     </div>
 
@@ -177,7 +237,9 @@
     {/if}
     {#if error}<p class="board-notice error" role="alert">{error}</p>{/if}
 
-    {#if !snapshot && loading}
+    {#if section === 'templates'}
+      <TemplatesView {relayId} {projects} {boardId} />
+    {:else if !snapshot && loading}
       <div class="empty-state" role="status">Loading board…</div>
     {:else if !snapshot}
       <div class="empty-state" role="status">This relay has no board to show yet.</div>
@@ -249,6 +311,24 @@
       <Button disabled={!newProjectPath.trim() || creatingProject} onclick={() => { void addProject(); }}>Create project</Button>
       <Button variant="ghost" onclick={() => { switcherOpen = false; }}>Close</Button>
     </div>
+  </div>
+</AppDialog>
+
+<AppDialog id="board-actions" bind:open={actionsOpen} title="Board actions" description={snapshot ? `Keep ${boardName} as a reusable pipeline, or have an agent rework its columns with you.` : ''}>
+  <div class="form-stack">
+    <label class="field-label" for="board-save-name">Save as template</label>
+    <input id="board-save-name" bind:value={saveName} autocomplete="off" placeholder="Template name" />
+    <div class="dialog-actions">
+      <Button disabled={actionBusy || !saveName.trim()} onclick={() => { void saveAsTemplate(); }}>Save template</Button>
+    </div>
+    <label class="field-label" for="board-edit-intent">Edit with AI</label>
+    <textarea id="board-edit-intent" bind:value={editIntent} rows="3" placeholder="What should change? e.g. add a QA stage before Done…"></textarea>
+    {#if !profiles.length}<p class="hint">This relay has no agent profile; add one in Herdr first.</p>{/if}
+    <div class="dialog-actions">
+      <Button variant="secondary" disabled={actionBusy || !profiles.length} onclick={() => { void editWithAI(); }}>Start the editor</Button>
+      <Button variant="ghost" disabled={actionBusy} onclick={() => { actionsOpen = false; }}>Close</Button>
+    </div>
+    {#if actionError}<p class="board-notice error" role="alert">{actionError}</p>{/if}
   </div>
 </AppDialog>
 

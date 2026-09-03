@@ -900,6 +900,10 @@ class RelayStore {
       this.handleBoardResult(message);
       return;
     }
+    if (message.type === 'board_template_result') {
+      this.handleBoardTemplateResult(message);
+      return;
+    }
     // boardd's events are coarse by contract: the payload is for logs, and the
     // client refetches. A resync says the stream had a gap, which needs exactly
     // the same response, so both land on one revision bump.
@@ -1269,6 +1273,66 @@ class RelayStore {
         reject(new CommandError('Could not reach the board'));
       }
     });
+  }
+
+  /**
+   * Sends one of the relay's board template messages and resolves with the
+   * relay's answer (the template, the list, the apply result, the brief).
+   * Templates are the relay's own files, so this needs a connected relay but
+   * not a board daemon, except for export, apply and edit briefs.
+   */
+  boardTemplate<T = Record<string, unknown>>(
+    relayId: string,
+    action: 'list' | 'get' | 'save' | 'delete' | 'export' | 'apply' | 'brief',
+    payload: Record<string, unknown> = {},
+  ): Promise<T> {
+    const connection = this.connectionsValue.get(relayId);
+    if (!connection || connection.status !== 'connected') {
+      return Promise.reject(new CommandError('Relay is not connected'));
+    }
+    if (!connection.capabilities.includes('board_templates_v1')) {
+      return Promise.reject(new CommandError('This relay does not keep board templates; update it.'));
+    }
+    const requestId = commandRequestId();
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingBoardRequests.delete(requestId);
+        reject(new CommandError('The relay did not answer'));
+      }, COMMAND_TIMEOUT_MS);
+      this.pendingBoardRequests.set(requestId, {
+        resolve: resolve as (value: unknown) => void,
+        reject,
+        timer,
+      });
+      const sent = this.sendRaw(relayId, {
+        type: `board_template_${action}`,
+        request_id: requestId,
+        protocol: APP_PROTOCOL_VERSION,
+        ...payload,
+      });
+      if (!sent) {
+        clearTimeout(timer);
+        this.pendingBoardRequests.delete(requestId);
+        reject(new CommandError('Could not reach the relay'));
+      }
+    });
+  }
+
+  private handleBoardTemplateResult(message: Record<string, any>): void {
+    const requestId = String(message.request_id || '');
+    const pending = this.pendingBoardRequests.get(requestId);
+    if (!pending) return;
+    this.pendingBoardRequests.delete(requestId);
+    clearTimeout(pending.timer);
+    if (message.ok) {
+      const payload: Record<string, unknown> = { ...message };
+      delete payload.type;
+      delete payload.request_id;
+      delete payload.ok;
+      pending.resolve(payload);
+      return;
+    }
+    pending.reject(new CommandError(String(message.error || 'The template request failed')));
   }
 
   private handleBoardResult(message: Record<string, any>): void {

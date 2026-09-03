@@ -49,6 +49,7 @@ async function boot(page: Page, relays: RelayFixture[] = [], path = '/', options
     let nextInteraction: Record<string, unknown> | null = null;
     let conversationFixture: { entries: unknown[]; total: number; reason?: string } | null = null;
     let boardFixture: Record<string, unknown> | null = null;
+    let templateFixture: Record<string, unknown> | null = null;
     let autoCommands = true;
 
     class MockSocket {
@@ -279,6 +280,16 @@ async function boot(page: Page, relays: RelayFixture[] = [], path = '/', options
             }));
           return;
         }
+        // Templates are the relay's own; the mock answers each action from a
+        // fixture keyed by action, and refuses what has no entry.
+        if (typeof message.type === 'string' && message.type.startsWith('board_template_')) {
+          const action = message.type.slice('board_template_'.length);
+          const payload = templateFixture ? templateFixture[action] : undefined;
+          queueMicrotask(() => this.server(payload === undefined
+            ? { type: 'board_template_result', request_id: message.request_id, action, ok: false, error: `no fixture for ${action}` }
+            : { type: 'board_template_result', request_id: message.request_id, action, ok: true, ...(payload as Record<string, unknown>) }));
+          return;
+        }
         if (message.type === 'push_subscribe' || message.type === 'push_unsubscribe') return;
         const phase = message.type === 'answer_question' && nextInteraction
           ? 'advanced'
@@ -316,6 +327,7 @@ async function boot(page: Page, relays: RelayFixture[] = [], path = '/', options
         conversationFixture = fixture;
       },
       __relayBoardFixture(fixture: Record<string, unknown> | null) { boardFixture = fixture; },
+      __relayBoardTemplateFixture(fixture: Record<string, unknown> | null) { templateFixture = fixture; },
       __relayAutoCommands(enabled: boolean) { autoCommands = enabled; },
     });
   }, {
@@ -376,6 +388,16 @@ async function setBoardFixture(page: Page, fixture: Record<string, unknown> | nu
       __relayBoardFixture(next: Record<string, unknown> | null): void;
     };
     harnessWindow.__relayBoardFixture(value);
+  }, fixture);
+}
+
+/** One entry per board template action ("list", "apply", "brief", ...). */
+async function setTemplateFixture(page: Page, fixture: Record<string, unknown> | null) {
+  await page.evaluate((value) => {
+    const harnessWindow = window as unknown as {
+      __relayBoardTemplateFixture(next: Record<string, unknown> | null): void;
+    };
+    harnessWindow.__relayBoardTemplateFixture(value);
   }, fixture);
 }
 
@@ -5796,4 +5818,108 @@ test('switches the agent mode and model from the conversation chips', async ({ p
     return sent?.text;
   }).toBe('/model sonnet');
   await expect(dialog).toContainText('Asked for sonnet.');
+});
+
+const templateBoardFixture = {
+  'project.list': {
+    projects: [{
+      project: { id: 2, name: 'mobile-relay', scope_path: '/work', archived_at: null },
+      boards: [{ id: 2, name: 'main', project_id: 2, scope_path: '/work', archived_at: null }],
+      selected_board_id: 2,
+    }],
+    selected_project_id: 2,
+  },
+  'board.get': {
+    board: { id: 2, name: 'main', project_id: 2, scope_path: '/work', archived_at: null },
+    columns: [
+      { id: 20, board_id: 2, name: 'Auto', position: 0, trigger: 'auto', fresh_session: false },
+      { id: 21, board_id: 2, name: 'Review', position: 1, trigger: 'manual', fresh_session: false },
+    ],
+    cards: [],
+    active_runs: [],
+  },
+  'board.select': {},
+};
+
+const reviewPipeline = {
+  name: 'Review pipeline',
+  description: 'Execute then review',
+  columns: [
+    { name: 'Backlog', trigger: 'manual' },
+    { name: 'Execute', trigger: 'auto', system_prompt: 'Do it', model: 'sonnet', on_success: 'Done', on_fail: 'Backlog' },
+    { name: 'Done', trigger: 'manual' },
+  ],
+};
+
+async function bootTemplates(page: Page) {
+  await boot(page, [fedora]);
+  await expect.poll(() => socketCount(page)).toBe(1);
+  await handshake(page, 0, {
+    capabilities: ['attention_classification', 'board_v1', 'board_templates_v1', 'conversation_history'],
+    board: {
+      version: '0.16.1', herdr_connected: true, active_runs: 0, queued_runs: 0,
+      methods: ['board.get', 'project.list', 'board.select'],
+    },
+  });
+  await setBoardFixture(page, templateBoardFixture);
+}
+
+test('lists board templates and applies one to a board', async ({ page }) => {
+  await bootTemplates(page);
+  await setTemplateFixture(page, {
+    list: { templates: [reviewPipeline], dir: '/home/test/board-templates' },
+    apply: { result: { created: ['Backlog', 'Done'], updated: ['Execute'], deleted: ['Auto', 'Review'] }, mode: 'replace' },
+  });
+
+  await page.locator('.tab-bar').getByRole('button', { name: 'Board' }).click();
+  await page.getByRole('tab', { name: 'Templates' }).click();
+  const card = page.getByRole('article', { name: 'Review pipeline' });
+  await expect(card).toBeVisible();
+  await expect(card).toContainText('3 columns · 1 start an agent');
+  await expect(card.locator('.project-chip', { hasText: 'Execute' })).toHaveClass(/auto/);
+
+  await card.getByRole('button', { name: 'Apply…' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Apply Review pipeline' });
+  await expect(dialog).toBeVisible();
+  // Replace names what it will remove before anything happens.
+  await dialog.getByRole('button', { name: /^Replace/ }).first().click();
+  await expect(dialog).toContainText('Replace will delete Auto, Review');
+  await dialog.getByRole('button', { name: 'Replace columns' }).click();
+  await expect.poll(async () => (await commands(page)).find((command) => command.type === 'board_template_apply'))
+    .toMatchObject({ board_id: 2, name: 'Review pipeline', mode: 'replace' });
+  await expect(dialog).toContainText('2 created, 1 updated, 2 deleted');
+});
+
+test('starts an agent to design a template and opens its conversation', async ({ page }) => {
+  await bootTemplates(page);
+  await setConversationFixture(page, { entries: [], total: 0 });
+  await setTemplateFixture(page, {
+    list: { templates: [], dir: '/home/test/board-templates' },
+    brief: {
+      kind: 'design', name: 'Docs sprint', cwd: '/home/test/board-templates',
+      prompt: 'Design the Docs sprint template.', label: 'Template: Docs sprint',
+    },
+  });
+
+  await page.locator('.tab-bar').getByRole('button', { name: 'Board' }).click();
+  await page.getByRole('tab', { name: 'Templates' }).click();
+  await expect(page.getByText('No template yet')).toBeVisible();
+  await page.getByRole('button', { name: 'Design with AI' }).click();
+  await page.getByRole('textbox', { name: 'Template name' }).fill('Docs sprint');
+  await page.getByRole('textbox', { name: 'What it is for' }).fill('write and review docs');
+  await page.getByRole('button', { name: 'Start designing' }).click();
+
+  await expect.poll(async () => (await commands(page)).find((command) => command.type === 'board_template_brief'))
+    .toMatchObject({ kind: 'design', name: 'Docs sprint', intent: 'write and review docs' });
+  // The designer is a Claude Code agent started in the templates folder with the brief as its first prompt.
+  await expect.poll(async () => (await commands(page)).find((command) => command.type === 'agent_start'))
+    .toMatchObject({ profile_id: 'claude', cwd: '/home/test/board-templates', prompt: 'Design the Docs sprint template.', name: 'Template: Docs sprint' });
+  await server(page, 0, {
+    type: 'agents',
+    agents: [{
+      pane_id: 'w1:p9', status: 'working', project: 'board-templates', agent: 'claude', name: 'Template: Docs sprint',
+      cwd: '/home/test/board-templates', session: 'abc', conversation_history_available: true,
+    }],
+  });
+  await expect(page.getByRole('heading', { name: 'Conversation', exact: true })).toBeVisible();
 });

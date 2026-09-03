@@ -13,6 +13,9 @@ import type {
   BoardSession,
   BoardSnapshot,
   BoardSpace,
+  BoardTemplate,
+  BoardTemplateApplyResult,
+  BoardTemplateBrief,
   ProjectList,
 } from './types';
 
@@ -128,4 +131,49 @@ export function createColumn(
   trigger: string,
 ): Promise<BoardColumn> {
   return relayStore.boardRpc<BoardColumn>(relayId, 'column.create', { board_id: boardId, name, trigger });
+}
+
+// Templates are the relay's, not boardd's: reusable pipelines kept as files,
+// independent of any project, replayed onto a board on request.
+
+export function listTemplates(relayId: string): Promise<{ templates: BoardTemplate[]; dir: string }> {
+  return relayStore.boardTemplate(relayId, 'list');
+}
+
+export function getTemplate(relayId: string, name: string): Promise<{ template: BoardTemplate }> {
+  return relayStore.boardTemplate(relayId, 'get', { name });
+}
+
+export function saveTemplate(relayId: string, template: BoardTemplate): Promise<{ template: BoardTemplate }> {
+  return relayStore.boardTemplate(relayId, 'save', { template });
+}
+
+export function deleteTemplate(relayId: string, name: string): Promise<{ name: string }> {
+  return relayStore.boardTemplate(relayId, 'delete', { name });
+}
+
+/** Turns a board's columns into a template; `save` also keeps it. */
+export function exportTemplate(
+  relayId: string,
+  boardId: number,
+  options: { name?: string; description?: string; save?: boolean } = {},
+): Promise<{ template: BoardTemplate; board_name: string; saved: boolean }> {
+  return relayStore.boardTemplate(relayId, 'export', { board_id: boardId, ...options });
+}
+
+export function applyTemplate(
+  relayId: string,
+  boardId: number,
+  name: string,
+  mode: 'replace' | 'append',
+): Promise<{ result: BoardTemplateApplyResult; mode: string }> {
+  return relayStore.boardTemplate(relayId, 'apply', { board_id: boardId, name, mode });
+}
+
+/** The working directory and first prompt for an agent that designs a template or edits a board. */
+export function templateBrief(
+  relayId: string,
+  request: { kind: 'design'; name: string; intent?: string } | { kind: 'edit'; board_id: number; intent?: string },
+): Promise<BoardTemplateBrief> {
+  return relayStore.boardTemplate<BoardTemplateBrief>(relayId, 'brief', request);
 }

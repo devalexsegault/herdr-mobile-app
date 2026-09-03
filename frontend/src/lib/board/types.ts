@@ -134,3 +134,41 @@ export interface BoardErrorPayload {
   message: string;
   details?: unknown;
 }
+
+/** One stage of a reusable pipeline; transitions name sibling columns. */
+export interface BoardTemplateColumn {
+  name: string;
+  trigger?: 'manual' | 'auto';
+  system_prompt?: string;
+  harness?: string;
+  model?: string;
+  effort?: string;
+  permission?: string;
+  timeout_minutes?: number;
+  fresh_session?: boolean;
+  on_success?: string;
+  on_fail?: string;
+}
+
+/** A reusable pipeline kept by the relay, independent of any project. */
+export interface BoardTemplate {
+  name: string;
+  description?: string;
+  columns: BoardTemplateColumn[];
+}
+
+/** What applying a template changed, by column name. */
+export interface BoardTemplateApplyResult {
+  created: string[];
+  updated: string[];
+  deleted: string[];
+}
+
+/** Where and how to start the agent that designs or edits a pipeline. */
+export interface BoardTemplateBrief {
+  kind: 'design' | 'edit';
+  name: string;
+  cwd: string;
+  prompt: string;
+  label: string;
+}

@@ -1165,6 +1165,29 @@ textarea { min-height: 6.5rem; resize: vertical; }
 .waiting-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
 .waiting-actions .button { flex: 1 1 8rem; }
 
+/* Board templates: a section of the Board tab with its own list of cards. */
+.board-bar-tools { align-items: center; display: flex; gap: .4rem; margin-left: auto; }
+.templates-view { display: flex; flex-direction: column; gap: .6rem; padding: 0 .1rem 1rem; }
+.templates-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+.template-list { display: flex; flex-direction: column; gap: .6rem; }
+.template-card { background: var(--card); border: 1px solid var(--border); border-radius: .85rem; display: flex; flex-direction: column; gap: .5rem; padding: .75rem .8rem; }
+.template-card-head { align-items: baseline; display: flex; flex-wrap: wrap; gap: .2rem .6rem; justify-content: space-between; }
+.template-card-head h2 { font-size: .95rem; margin: 0; }
+.template-card-meta, .template-card-description { color: var(--muted); font-size: .72rem; margin: 0; }
+.template-columns { display: flex; flex-wrap: wrap; gap: .3rem; }
+.template-columns .project-chip.auto { border: 1px solid color-mix(in srgb, var(--primary) 45%, transparent); color: var(--foreground); }
+.template-card-actions { display: flex; flex-wrap: wrap; gap: .35rem; }
+.template-editor-columns { display: flex; flex-direction: column; gap: .4rem; }
+.template-editor-column { border: 1px solid var(--border); border-radius: .6rem; padding: .4rem .45rem; }
+.template-editor-column.expanded { background: color-mix(in srgb, var(--secondary) 45%, transparent); }
+.template-editor-column-head { align-items: center; display: flex; gap: .3rem; }
+.template-editor-column-head input.template-editor-column-name { flex: 1; min-width: 0; }
+.template-editor-column-head select { flex: 0 0 auto; width: auto; }
+.template-editor-column-body { margin-top: .5rem; }
+.template-editor-grid { display: grid; gap: .45rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.template-editor-grid label { display: flex; flex-direction: column; gap: .2rem; }
+.template-editor-grid label.template-editor-check { align-items: center; flex-direction: row; gap: .4rem; }
+.template-editor-grid input, .template-editor-grid select { width: 100%; }
 .project-chip { background: var(--secondary); border-radius: .4rem; color: var(--muted); font-size: .68rem; overflow: hidden; padding: .12rem .4rem; text-overflow: ellipsis; white-space: nowrap; }
 
 .project-group { display: flex; flex-direction: column; gap: .1rem; }
