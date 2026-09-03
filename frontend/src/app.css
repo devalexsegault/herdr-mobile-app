@@ -1407,3 +1407,7 @@ textarea { min-height: 6.5rem; resize: vertical; }
 .inset-disclosure > summary svg { height: 1.2rem; width: 1.2rem; }
 .inset-disclosure[open] > summary { margin-bottom: .5rem; }
 .settings-page .form-stack > label, .settings-page .field-label { font-size: .78rem; font-weight: 550; letter-spacing: 0; text-transform: none; }
+
+/* The model picker's free-text row, for an alias the shortlist does not carry. */
+.model-other { align-items: center; display: flex; gap: .5rem; }
+.model-other input { flex: 1; min-width: 0; }

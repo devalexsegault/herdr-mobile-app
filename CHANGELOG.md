@@ -3,6 +3,13 @@
 Notable user-facing changes to Herdr Mobile Relay are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
+## [0.20.12] - 2026-09-03
+
+### Added
+
+- The conversation's model picker lists Fable and takes any other alias in a
+  free field, so a model the shortlist does not carry can still be requested.
+
 ## [0.20.11] - 2026-09-03
 
 ### Changed

@@ -99,8 +99,12 @@
     { id: 'plan', label: 'Plan', pattern: /plan mode on/i, hint: 'Reads and plans only, no changes.' },
     { id: 'auto', label: 'Auto', pattern: /auto mode on|bypass permissions on/i, hint: 'Handles prompts on its own.' },
   ] as const;
+  // The aliases Claude Code accepts after /model. Kept as a shortlist with a
+  // free-text field beside it, because the set an installation offers moves
+  // with the CLI and the account.
   const MODELS = [
-    { id: 'opus', label: 'Opus', hint: 'Deepest reasoning, slowest.' },
+    { id: 'fable', label: 'Fable', hint: 'Most capable, above Opus.' },
+    { id: 'opus', label: 'Opus', hint: 'Deep reasoning.' },
     { id: 'sonnet', label: 'Sonnet', hint: 'Balanced, the usual choice.' },
     { id: 'haiku', label: 'Haiku', hint: 'Fastest, for mechanical work.' },
     { id: 'default', label: 'Default', hint: 'The account default.' },
@@ -119,9 +123,10 @@
     return '';
   });
   function modelAlias(model: string): string {
-    const match = /(opus|sonnet|haiku)/i.exec(model);
+    const match = /(fable|mythos|opus|sonnet|haiku)/i.exec(model);
     return match ? match[1].toLowerCase() : model;
   }
+  let modelDraft = $state('');
   let settingsOpen = $state(false);
   let settingsBusy = $state(false);
   let settingsStatus = $state('');
@@ -792,6 +797,20 @@
           </button>
         {/each}
       </div>
+      <form
+        class="model-other"
+        onsubmit={(event) => { event.preventDefault(); const value = modelDraft.trim(); if (value) { modelDraft = ''; void selectModel(value); } }}
+      >
+        <input
+          bind:value={modelDraft}
+          aria-label="Another model"
+          placeholder="Another model, as /model accepts it"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+        />
+        <Button type="submit" variant="secondary" size="sm" disabled={!modelDraft.trim() || settingsBusy}>Use</Button>
+      </form>
     {:else}
       <Button variant="secondary" disabled={settingsBusy} onclick={() => { void selectModel(''); }}>Open the model picker</Button>
     {/if}

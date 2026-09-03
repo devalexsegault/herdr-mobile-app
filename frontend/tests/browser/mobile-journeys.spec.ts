@@ -5826,6 +5826,14 @@ test('switches the agent mode and model from the conversation chips', async ({ p
     return sent?.text;
   }).toBe('/model sonnet');
   await expect(dialog).toContainText('Asked for sonnet.');
+
+  // Fable is on the shortlist, and any other alias goes through the free field.
+  await expect(dialog.getByRole('button', { name: /^Fable/ })).toBeVisible();
+  await dialog.getByRole('textbox', { name: 'Another model' }).fill('opusplan');
+  await dialog.getByRole('button', { name: 'Use' }).click();
+  await expect.poll(async () => (await commands(page))
+    .filter((command) => command.type === 'submit_prompt')
+    .map((command) => (command as { text?: string }).text)).toContain('/model opusplan');
 });
 
 const templateBoardFixture = {
