@@ -47,7 +47,10 @@ import { constants, gzipSync } from 'node:zlib';
 // and the board: hairline activity rows, segmented choice groups, bounded board
 // lanes, the outline treatment for destructive actions and the warm token set
 // add 1,821 B gzip, and the previous ceiling left 353 B.
-const limitKiB = 142;
+// Raised from 142 KiB for board templates: the Templates tab, the template
+// editor, the apply and AI-design dialogs and their relay calls add 6,110 B
+// gzip to the 0.20.8 bundle, which had no headroom left under 142 KiB.
+const limitKiB = 149;
 const limit = limitKiB * 1024;
 const root = resolve(process.argv[2] || 'dist');
 const files = ['index.html', 'assets/app.js', 'assets/app.css'];
