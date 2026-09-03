@@ -111,6 +111,27 @@ with its run controls (cancel, retry, mark done), its move targets, its
 instruction and its comments; a card with an open run cannot be moved until the
 run ends. Cards, comments and whole projects can be created from the phone.
 
+### Templates
+
+A relay that advertises `board_templates_v1` keeps reusable pipelines as plain
+JSON files under its plugin config directory (`board-templates/<name>.json`):
+a name, a description and the columns with their trigger, prompt, harness,
+model, effort, permission, timeout, session mode and transitions, the latter
+naming sibling columns rather than database ids. Templates belong to no
+project. The **Templates** tab of the Board section lists them with their
+columns; a template can be applied to any board (**Append** adds the columns
+the board lacks, **Replace** rewrites matching columns, removes the others
+after naming them, moves their cards to the template's first column and orders
+the board like the template), edited in a form, duplicated or deleted. The
+**⋯** button of a board saves its columns as a template.
+
+Two actions hand the work to a Claude Code agent started in the templates
+folder, whose conversation opens right away: **Design with AI** asks for a name
+and a one-line intent and briefs the agent to write the file with you; **Edit
+with AI** on a board briefs it with the board's current columns and the `board`
+CLI so it applies the changes itself and reports them. When that agent's turn
+ends, the template list refreshes.
+
 ## Workspace navigation and inspection
 
 The All agents screen keeps agents that need input visible at the top. By default,

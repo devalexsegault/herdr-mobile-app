@@ -3,6 +3,20 @@
 Notable user-facing changes to Herdr Mobile Relay are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Board templates: reusable pipelines the relay keeps as JSON files under its
+  plugin config directory, independent of any project. The Board section's
+  Templates tab lists them with their columns, applies one to any board
+  (append or replace, naming what replace deletes), edits them in a form,
+  duplicates, deletes, and saves a board as a template.
+- Design with AI and Edit with AI: a Claude Code agent is started in the
+  templates folder with a brief (the file format, the board rules, and for a
+  board its current columns plus the `board` CLI), and its conversation opens
+  so the pipeline is built or reworked by talking to it.
+
 ## [0.20.8] - 2026-09-03
 
 ### Added
