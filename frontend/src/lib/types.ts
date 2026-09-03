@@ -258,6 +258,8 @@ export interface ConversationEntry {
   text: string;
   truncated?: boolean;
   tools?: ConversationTool[];
+  /** Model that produced an assistant turn, when the transcript records it. */
+  model?: string;
 }
 
 export interface ConversationPage {

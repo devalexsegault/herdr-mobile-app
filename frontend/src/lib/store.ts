@@ -1659,6 +1659,7 @@ class RelayStore {
             text: String(entry.text || ''),
             tools,
             truncated: entry.truncated === true,
+            model: typeof entry.model === 'string' && entry.model ? entry.model : undefined,
           };
         })
         .filter((entry) => entry.id && (entry.text || entry.tools.length))

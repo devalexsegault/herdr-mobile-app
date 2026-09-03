@@ -437,3 +437,17 @@ func TestClaudeConversationReadForRejectsProjectDirectoryEscape(t *testing.T) {
 		t.Fatalf("page = %#v, want an escaping project symlink rejected", page)
 	}
 }
+
+func TestParseTranscriptRecordsClaudeModel(t *testing.T) {
+	assistant := `{"type":"assistant","uuid":"m1","timestamp":"2026-08-12T10:00:01Z","message":{"model":"claude-opus-4-1","content":[{"type":"text","text":"answer"}]}}`
+	entries := parseTranscript("claude", assistant)
+	if len(entries) != 1 || entries[0].Model != "claude-opus-4-1" {
+		t.Fatalf("assistant entries = %+v, want the recorded model", entries)
+	}
+	// A user turn never names a model, whatever the record carries.
+	user := `{"type":"user","uuid":"u1","timestamp":"2026-08-12T10:00:00Z","message":{"model":"claude-opus-4-1","role":"user","content":[{"type":"text","text":"hi"}]}}`
+	entries = parseTranscript("claude", user)
+	if len(entries) != 1 || entries[0].Model != "" {
+		t.Fatalf("user entries = %+v, want no model", entries)
+	}
+}

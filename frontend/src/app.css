@@ -422,6 +422,15 @@ textarea { min-height: 6.5rem; resize: vertical; }
 .conversation-input-area { border-top: 1px solid var(--border); flex: 0 0 auto; margin-top: auto; min-width: 0; padding-top: .7rem; }
 .conversation-composer { align-items: flex-end; display: flex; gap: .5rem; }
 .conversation-composer-status { color: var(--muted); font-size: .68rem; margin: .35rem .2rem 0; }
+.conversation-chips { display: flex; flex-wrap: wrap; gap: .4rem; padding: 0 .1rem .45rem; }
+.chip-button { align-items: center; appearance: none; background: var(--secondary); border: 1px solid var(--border); border-radius: 999px; color: var(--foreground); cursor: pointer; display: inline-flex; font: inherit; font-size: .72rem; gap: .35rem; line-height: 1; padding: .38rem .7rem; }
+.chip-button:active { transform: scale(.98); }
+.chip-key { color: var(--muted); letter-spacing: .04em; text-transform: uppercase; font-size: .6rem; }
+.chip-value { font-weight: 600; text-transform: capitalize; }
+.settings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.settings-grid button { align-items: flex-start; display: flex; flex-direction: column; gap: .2rem; padding: .6rem .7rem; text-align: left; }
+.settings-grid button small { color: var(--muted); font-size: .66rem; line-height: 1.3; }
+.settings-section-title { color: var(--muted); font-size: .68rem; letter-spacing: .06em; margin: .2rem 0 0; text-transform: uppercase; }
 .composer-slash { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 1.1rem; font-weight: 700; }
 .command-picker { display: flex; flex-direction: column; gap: .5rem; }
 .command-picker-list { max-height: 55vh; }

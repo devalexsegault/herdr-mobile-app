@@ -3,6 +3,16 @@
 Notable user-facing changes to Herdr Mobile Relay are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
+## [0.20.8] - 2026-09-03
+
+### Added
+
+- Mode and model chips above the conversation composer. They read the pane's
+  status line and the transcript, and open a picker: a mode is reached by
+  cycling the agent's shift+tab until its status line names it, a model by
+  sending `/model <name>` (Claude Code; other harnesses get the picker opened
+  in the terminal).
+
 ## [0.20.7] - 2026-09-02
 
 ### Fixed

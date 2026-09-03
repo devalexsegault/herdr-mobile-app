@@ -47,7 +47,10 @@ type Entry struct {
 	Role      string         `json:"role"`
 	Text      string         `json:"text,omitempty"`
 	Tools     []ToolActivity `json:"tools,omitempty"`
-	Truncated bool           `json:"truncated,omitempty"`
+	// Model is the model that produced an assistant turn, when the transcript
+	// records it (Claude Code does); the phone shows the latest one.
+	Model     string `json:"model,omitempty"`
+	Truncated bool   `json:"truncated,omitempty"`
 }
 
 type Page struct {
@@ -530,6 +533,7 @@ func parseTranscript(agent, text string) []Entry {
 		entryIndex := len(entries)
 		entries = append(entries, Entry{
 			ID: id, Timestamp: timestamp, Role: role, Text: body, Tools: calls, Truncated: truncated,
+			Model: recordModel(record, role),
 		})
 		for toolIndex := range calls {
 			if calls[toolIndex].ID != "" {
@@ -822,4 +826,17 @@ func stableRowID(line string, seen map[string]int) string {
 func stringValue(value any) string {
 	text, _ := value.(string)
 	return text
+}
+
+// recordModel returns the model named on an assistant record, as Claude Code
+// writes it under message.model; other harnesses leave it empty.
+func recordModel(record map[string]any, role string) string {
+	if role != "assistant" {
+		return ""
+	}
+	message, ok := record["message"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(stringValue(message["model"]))
 }

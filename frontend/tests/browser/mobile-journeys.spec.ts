@@ -5744,3 +5744,56 @@ test('keeps a sent answer visible while the agent is still blocked on it', async
   await server(page, 0, { type: 'agent_update', ...blocked, event_id: 'evt-2', prompt: 'Run tests?', pane_revision: 3 });
   await expect(answer.getByRole('button', { name: 'Approve once' })).toBeVisible();
 });
+
+test('switches the agent mode and model from the conversation chips', async ({ page }) => {
+  await boot(page, [fedora]);
+  await expect.poll(() => socketCount(page)).toBe(1);
+  await handshake(page, 0, {
+    capabilities: ['attention_classification', 'structured_questions', 'conversation_history'],
+  });
+  await setConversationFixture(page, {
+    entries: [
+      { id: 'u1', timestamp: '2026-09-03T08:00:00Z', role: 'user', text: 'hello' },
+      { id: 'a1', timestamp: '2026-09-03T08:00:01Z', role: 'assistant', text: 'hi', model: 'claude-opus-4-1' },
+    ],
+    total: 2,
+  });
+  await server(page, 0, {
+    type: 'agents',
+    agents: [{
+      pane_id: 'w1:p1', status: 'idle', project: 'Mode app', agent: 'claude',
+      session: 'abc', conversation_history_available: true,
+    }],
+  });
+  await page.getByRole('button', { name: 'Open Mode app on Fedora' }).click();
+  await page.locator('.mode-switch').getByRole('button', { name: 'Chat' }).click();
+  await server(page, 0, {
+    type: 'pane_content', pane_id: 'w1:p1', format: 'plain',
+    content: 'some output\n⏸ manual mode on · ? for shortcuts',
+  });
+
+  const chips = page.getByRole('button', { name: /^Mode: manual/i });
+  await expect(chips).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Model: opus/i })).toBeVisible();
+
+  await chips.click();
+  const dialog = page.getByRole('dialog', { name: 'Agent settings' });
+  await expect(dialog.getByRole('button', { name: /^Manual/ })).toHaveAttribute('aria-pressed', 'true');
+  await dialog.getByRole('button', { name: /^Auto/ }).click();
+  // One shift+tab per step, and the chip follows the pane's status line.
+  await expect.poll(async () => (await commands(page)).filter((command) => command.type === 'send_keys').length).toBe(1);
+  await server(page, 0, {
+    type: 'pane_content', pane_id: 'w1:p1', format: 'plain',
+    content: 'some output\n⏵⏵ auto mode on (shift+tab to cycle)',
+  });
+  await expect(dialog).toContainText('Mode set to auto.');
+  await expect(page.getByRole('button', { name: /^Mode: auto/i })).toBeVisible();
+  await expect.poll(async () => (await commands(page)).filter((command) => command.type === 'send_keys').length).toBe(1);
+
+  await dialog.getByRole('button', { name: /^Sonnet/ }).click();
+  await expect.poll(async () => {
+    const sent = (await commands(page)).find((command) => command.type === 'submit_prompt') as { text?: string } | undefined;
+    return sent?.text;
+  }).toBe('/model sonnet');
+  await expect(dialog).toContainText('Asked for sonnet.');
+});

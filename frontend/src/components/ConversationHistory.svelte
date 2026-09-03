@@ -22,6 +22,7 @@
   let { agent }: { agent: Agent } = $props();
 
   const responding = relayStore.responding;
+  const frames = relayStore.terminalFrames;
 
   let entries = $state<ConversationEntry[]>([]);
   let available = $state(true);
@@ -88,6 +89,108 @@
     return () => clearInterval(timer);
   });
 
+  // Mode and model live in the pane's status line and in the transcript; the
+  // chips above the composer surface them and open a picker to change them.
+  const claudeLike = $derived(/^(claude|claudecode|qoder|qodercli)$/i.test(String(agent.agent || '')));
+  const MODES = [
+    { id: 'manual', label: 'Manual', pattern: /manual mode on|default mode on/i, hint: 'Asks before every tool.' },
+    { id: 'accept-edits', label: 'Accept edits', pattern: /accept edits on/i, hint: 'File edits go through, commands still ask.' },
+    { id: 'plan', label: 'Plan', pattern: /plan mode on/i, hint: 'Reads and plans only, no changes.' },
+    { id: 'auto', label: 'Auto', pattern: /auto mode on|bypass permissions on/i, hint: 'Handles prompts on its own.' },
+  ] as const;
+  const MODELS = [
+    { id: 'opus', label: 'Opus', hint: 'Deepest reasoning, slowest.' },
+    { id: 'sonnet', label: 'Sonnet', hint: 'Balanced, the usual choice.' },
+    { id: 'haiku', label: 'Haiku', hint: 'Fastest, for mechanical work.' },
+    { id: 'default', label: 'Default', hint: 'The account default.' },
+  ] as const;
+  const paneText = $derived(($frames.get(agent.pane_id)?.content || '').replace(/\u001b\[[0-9;?]*[A-Za-z]/g, ''));
+  const currentMode = $derived.by(() => {
+    const tail = paneText.slice(-2_000);
+    for (const mode of MODES) if (mode.pattern.test(tail)) return mode.id;
+    return '';
+  });
+  const currentModel = $derived.by(() => {
+    for (let index = entries.length - 1; index >= 0; index -= 1) {
+      const model = entries[index].model;
+      if (entries[index].role === 'assistant' && model) return model;
+    }
+    return '';
+  });
+  function modelAlias(model: string): string {
+    const match = /(opus|sonnet|haiku)/i.exec(model);
+    return match ? match[1].toLowerCase() : model;
+  }
+  let settingsOpen = $state(false);
+  let settingsBusy = $state(false);
+  let settingsStatus = $state('');
+  let settingsError = $state(false);
+
+  function openSettings() {
+    settingsOpen = true;
+    settingsStatus = '';
+    settingsError = false;
+    relayStore.readPane(agent, true);
+  }
+
+  async function nextFrame(previous: string, timeoutMs = 1_500): Promise<string> {
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const content = $frames.get(agent.pane_id)?.content || '';
+      if (content && content !== previous) return content;
+    }
+    return $frames.get(agent.pane_id)?.content || '';
+  }
+
+  // Claude Code cycles its permission mode on shift+tab; press until the
+  // status line names the requested one, and give up after a full turn.
+  async function selectMode(target: (typeof MODES)[number]['id']) {
+    if (settingsBusy) return;
+    settingsBusy = true;
+    settingsError = false;
+    settingsStatus = 'Switching mode…';
+    try {
+      for (let press = 0; press < MODES.length + 1; press += 1) {
+        if (currentMode === target) {
+          settingsStatus = `Mode set to ${MODES.find((mode) => mode.id === target)?.label.toLowerCase()}.`;
+          return;
+        }
+        const before = $frames.get(agent.pane_id)?.content || '';
+        await relayStore.sendToAgent(agent, { type: 'send_keys', keys: ['shift+tab'], activity_label: 'Cycled agent mode' });
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        relayStore.readPane(agent, true);
+        await nextFrame(before);
+      }
+      settingsError = true;
+      settingsStatus = 'The agent did not report that mode. Check it in Terminal.';
+    } catch (failure) {
+      settingsError = true;
+      settingsStatus = failure instanceof Error ? failure.message : 'The mode could not be changed.';
+    } finally {
+      settingsBusy = false;
+    }
+  }
+
+  async function selectModel(target: string) {
+    if (settingsBusy) return;
+    settingsBusy = true;
+    settingsError = false;
+    settingsStatus = 'Switching model…';
+    try {
+      await relayStore.sendToAgent(agent, { type: 'submit_prompt', text: claudeLike ? `/model ${target}` : '/model' });
+      settingsStatus = claudeLike
+        ? `Asked for ${target}. The next answer shows the model in use.`
+        : 'Opened the model picker; finish it in Terminal.';
+      setTimeout(() => { void loadLatest(); }, 800);
+    } catch (failure) {
+      settingsError = true;
+      settingsStatus = failure instanceof Error ? failure.message : 'The model could not be changed.';
+    } finally {
+      settingsBusy = false;
+    }
+  }
+
   async function answerApproval(index: number, option: string) {
     const eventId = String(agent.event_id || '');
     const ok = await relayStore.respond(agent, index, options.length, option);
@@ -114,6 +217,7 @@
     mode = localStorage.getItem('herdr-conversation-view') === 'activity' ? 'activity' : 'conversation';
     mounted = true;
     void loadLatest();
+    relayStore.readPane(agent, true);
     const refresh = setInterval(() => { void loadLatest(); }, 5_000);
     return () => {
       mounted = false;
@@ -518,6 +622,18 @@
         {/if}
       </div>
     {/if}
+    <div class="conversation-chips" aria-label="Agent settings">
+      <button type="button" class="chip-button" onclick={openSettings} aria-label="Mode: {currentMode ? MODES.find((mode) => mode.id === currentMode)?.label : 'unknown'}. Change mode">
+        <span class="chip-key">Mode</span>
+        <span class="chip-value">{currentMode ? MODES.find((mode) => mode.id === currentMode)?.label : '…'}</span>
+      </button>
+      {#if claudeLike}
+        <button type="button" class="chip-button" onclick={openSettings} aria-label="Model: {currentModel ? modelAlias(currentModel) : 'unknown'}. Change model">
+          <span class="chip-key">Model</span>
+          <span class="chip-value">{currentModel ? modelAlias(currentModel) : '…'}</span>
+        </button>
+      {/if}
+    </div>
     <form
       class="conversation-composer"
       aria-label="Send a prompt"
@@ -635,5 +751,57 @@
     {#if !commandsLoading && commandCatalog.truncated}
       <p class="slash-command-limit">More commands exist; filter to narrow the list.</p>
     {/if}
+  </div>
+</AppDialog>
+
+
+<AppDialog id="conversation-settings" bind:open={settingsOpen} title="Agent settings" description="Mode and model of this agent. Changes go to the running agent right away.">
+  <div class="form-stack">
+    <h3 class="settings-section-title">Mode</h3>
+    {#if claudeLike}
+      <div class="choice-grid settings-grid" role="group" aria-label="Mode">
+        {#each MODES as mode (mode.id)}
+          <button
+            type="button"
+            class="choice"
+            class:active={currentMode === mode.id}
+            aria-pressed={currentMode === mode.id}
+            disabled={settingsBusy}
+            onclick={() => { void selectMode(mode.id); }}
+          >
+            <strong>{mode.label}</strong>
+            <small>{mode.hint}</small>
+          </button>
+        {/each}
+      </div>
+    {:else}
+      <p class="hint">Mode switching from here is available for Claude Code; use the agent's own command in Terminal.</p>
+    {/if}
+    <h3 class="settings-section-title">Model</h3>
+    {#if claudeLike}
+      <div class="choice-grid settings-grid" role="group" aria-label="Model">
+        {#each MODELS as model (model.id)}
+          <button
+            type="button"
+            class="choice"
+            class:active={currentModel !== '' && modelAlias(currentModel) === model.id}
+            aria-pressed={currentModel !== '' && modelAlias(currentModel) === model.id}
+            disabled={settingsBusy}
+            onclick={() => { void selectModel(model.id); }}
+          >
+            <strong>{model.label}</strong>
+            <small>{model.hint}</small>
+          </button>
+        {/each}
+      </div>
+    {:else}
+      <Button variant="secondary" disabled={settingsBusy} onclick={() => { void selectModel(''); }}>Open the model picker</Button>
+    {/if}
+    {#if settingsStatus}
+      <p class:error={settingsError} class="conversation-composer-status" role="status">{settingsStatus}</p>
+    {/if}
+    <div class="dialog-actions">
+      <Button variant="ghost" onclick={() => { settingsOpen = false; }}>Close</Button>
+    </div>
   </div>
 </AppDialog>
