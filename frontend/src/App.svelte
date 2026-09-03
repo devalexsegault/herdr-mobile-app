@@ -24,7 +24,6 @@
   import Toast from '$components/ui/Toast.svelte';
   import { activityForNotification } from '$lib/activity';
   import {
-    agentContextLabel,
     agentNeedsInspection,
     agentNeedsResponse,
     agentStatusGroup,
@@ -32,6 +31,7 @@
     attentionKind,
     approvalOptions,
     approvalPromptPreview,
+    agentTitle,
     displayName,
     hostLabel,
   } from '$lib/agents';
@@ -158,11 +158,16 @@
     if ($currentView.view === 'activity_detail') return 'Activity';
     if ($currentView.view === 'board') return 'Board';
     if ($currentView.view === 'board_card') return 'Card';
-    if (activeAgent) return activeAgent.project || displayName(activeAgent);
+    if (activeAgent) return agentTitle(activeAgent);
     if ($currentView.view === 'terminal') return 'Terminal';
     return 'Today';
   });
-  const headerMeta = $derived(activeAgent ? terminalSecondaryLabel(activeAgent) : '');
+  const headerMeta = $derived.by(() => {
+    if (!activeAgent) return '';
+    const group = agentStatusGroup(activeAgent);
+    const state = group === 'working' ? 'working' : group === 'done' ? 'finished' : group === 'ready' ? 'idle' : group === 'blocked' || group === 'attention' ? 'needs you' : '';
+    return [activeAgent.project, activeAgent.herdr_session, activeAgent.agent, state].filter(Boolean).join(' · ');
+  });
   const headerIndicator = $derived.by(() => {
     if (!activeAgent) return {
       tone: inventoryUnavailable || inventoryLoading ? 'warning' : connected ? 'success' : connecting ? 'warning' : 'danger',
@@ -394,20 +399,6 @@
     else navigate({ view });
   }
 
-  function terminalSecondaryLabel(agent: Agent): string {
-    const parts: string[] = [];
-    const context = agentContextLabel(agent);
-    const primary = agent.project || displayName(agent);
-    if (context) parts.push(context);
-    if (agent.agent && agent.agent !== primary && agent.agent !== context) parts.push(agent.agent);
-    const host = hostLabel(agent);
-    if (host) {
-      if (parts.length) parts[parts.length - 1] = `${parts[parts.length - 1]} @${host}`;
-      else parts.push(`@${host}`);
-    }
-    return parts.join(' · ');
-  }
-
   function resolveNotificationTarget(target: NotificationTarget, allAgents: Agent[]): Agent | null {
     const matches = allAgents.filter((agent) => agent.raw_pane_id === target.pane_id);
     if (!matches.length) return null;
@@ -573,11 +564,6 @@
         </div>
         <Button variant="ghost" size="icon" aria-label="Manage agent" disabled={!activeAgent} onclick={() => { manageOpen = true; }}>•••</Button>
       {:else if activeTab || $currentView.view === 'agents_all'}
-        {#if activeTab === 'today'}
-        <Button variant="ghost" size="icon" aria-label="Start an agent" title="Start an agent" onclick={() => navigate({ view: 'launch' })}>
-          <svg class="header-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"></path></svg>
-        </Button>
-        {/if}
         {#if activeTab}
         <Button class="global-jump-button" variant="ghost" size="icon" aria-label="Search all agents" title="Search all agents" onclick={() => { jumpOpen = true; }}>
           <svg class="header-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">

@@ -501,18 +501,6 @@
 
   <Card>
     <h3>Relays</h3>
-    <form class="form-stack" onsubmit={addRelay}>
-      <label for="relay-label">Relay Name</label>
-      <input id="relay-label" bind:value={relayLabel} placeholder="Fedora" />
-      <label for="relay-url">Relay URL</label>
-      <input id="relay-url" bind:value={relayUrl} type="url" required placeholder="wss://relay-fedora.example.com" />
-      <label for="relay-token">Relay key</label>
-      <input id="relay-token" bind:value={relayToken} type="password" placeholder="HERDR_RELAY_TOKEN" />
-      <div class="form-actions">
-        <Button type="submit">Add Relay</Button>
-        <Button variant="secondary" onclick={() => relayStore.connectAll()}>Reconnect All</Button>
-      </div>
-    </form>
     <div class="relay-list">
       {#if !$relays.length}<p class="hint">No relays configured.</p>{/if}
       {#each relayRows as { relay, connection } (relay.id)}
@@ -576,6 +564,24 @@
         </article>
       {/each}
     </div>
+    <details class="inset-disclosure" open={!$relays.length}>
+      <summary>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"></path></svg>
+        Add a relay
+      </summary>
+      <form class="form-stack" onsubmit={addRelay}>
+        <label for="relay-label">Relay Name</label>
+        <input id="relay-label" bind:value={relayLabel} placeholder="Fedora" />
+        <label for="relay-url">Relay URL</label>
+        <input id="relay-url" bind:value={relayUrl} type="url" required placeholder="wss://relay-fedora.example.com" />
+        <label for="relay-token">Relay key</label>
+        <input id="relay-token" bind:value={relayToken} type="password" placeholder="HERDR_RELAY_TOKEN" />
+        <div class="form-actions">
+          <Button type="submit">Add Relay</Button>
+          <Button variant="secondary" onclick={() => relayStore.connectAll()}>Reconnect All</Button>
+        </div>
+      </form>
+    </details>
     {#each missingIntegrations as entry (entry.relayId)}
       <p class="hint integration-hint" role="status">
         <strong>{entry.label}:</strong>

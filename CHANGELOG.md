@@ -3,6 +3,20 @@
 Notable user-facing changes to Herdr Mobile Relay are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
+## [0.20.11] - 2026-09-03
+
+### Changed
+
+- Bottom sheets follow the finger: drag one down to dismiss it, a short drag
+  springs back.
+- The conversation header names the agent by its tab, with project, session,
+  harness and state underneath; the pending request reads as a card and the
+  slash button sits inside the composer.
+- Approval buttons carry short labels ("Auto mode", "Always allow") instead
+  of Claude Code's full sentences, so they fit on one line.
+- Settings keeps the add-relay form behind an "Add a relay" row once a relay
+  exists, and the header's extra "+" is gone (Today's floating button stays).
+
 ## [0.20.10] - 2026-09-03
 
 ### Changed

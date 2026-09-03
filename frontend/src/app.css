@@ -1140,7 +1140,7 @@ textarea { min-height: 6.5rem; resize: vertical; }
 .waiting-stack { display: flex; flex-direction: column; gap: .65rem; }
 .waiting-card {
   background: var(--card);
-  border: 1px solid color-mix(in srgb, var(--danger) 26%, var(--border));
+  border: 1px solid var(--border);
   border-radius: .9rem;
   display: flex;
   flex-direction: column;
@@ -1384,3 +1384,26 @@ textarea { min-height: 6.5rem; resize: vertical; }
 .sheet-action:disabled { opacity: .6; }
 .hint { color: var(--muted); font-size: .74rem; margin: -.2rem 0 .2rem; }
 .tab-bar-update { background: var(--warning); border: 2px solid var(--card); border-radius: 50%; height: .62rem; position: absolute; right: -.2rem; top: -.15rem; width: .62rem; }
+
+/* Sheet drag: no transition while the finger moves, a spring when released. */
+.app-dialog.sheet .dialog-content { touch-action: pan-y; transition: transform .28s cubic-bezier(.2,.8,.2,1); will-change: transform; }
+.app-dialog.sheet .dialog-content.dragging { transition: none; }
+/* The pending request reads as a card above the composer, like the canvas. */
+.conversation-answer { background: var(--card); border: 1px solid var(--border); border-radius: 1rem; box-shadow: 0 -4px 20px rgb(0 0 0 / .25); margin: 0 0 .5rem; padding: .8rem .9rem; }
+.conversation-answer-actions .button { min-height: 2.75rem; }
+/* The slash button sits inside the field, at its trailing edge. */
+.composer-field { position: relative; }
+.composer-field .composer-slash { appearance: none; background: transparent; border: 0; color: var(--muted); cursor: pointer; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 1.05rem; font-weight: 700; height: 2.5rem; padding: 0 .55rem; }
+.composer-field .composer-slash:disabled { opacity: .45; }
+.composer-field.has-text .composer-slash { display: none; }
+
+/* Left-aligned large titles whatever the page below does with text. */
+.large-title-block { text-align: left; }
+/* Settings: the add-relay form waits behind a row until it is needed, and
+   field labels read as labels, not as section titles. */
+.inset-disclosure { margin-top: .6rem; }
+.inset-disclosure > summary { align-items: center; color: var(--primary); cursor: pointer; display: flex; font-size: .92rem; font-weight: 550; gap: .5rem; list-style: none; min-height: 2.75rem; }
+.inset-disclosure > summary::-webkit-details-marker { display: none; }
+.inset-disclosure > summary svg { height: 1.2rem; width: 1.2rem; }
+.inset-disclosure[open] > summary { margin-bottom: .5rem; }
+.settings-page .form-stack > label, .settings-page .field-label { font-size: .78rem; font-weight: 550; letter-spacing: 0; text-transform: none; }

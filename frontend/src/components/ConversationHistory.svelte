@@ -10,6 +10,7 @@
     agentStatusGroup,
     approvalButtonTone,
     approvalOptions,
+    approvalShortLabel,
     approvalPromptPreview,
     displayName,
     questionInteraction,
@@ -615,7 +616,7 @@
                 <Button
                   variant={approvalButtonTone(option, index, options.length) === 'deny' ? 'danger' : approvalButtonTone(option, index, options.length) === 'trust' ? 'trust' : 'default'}
                   onclick={() => { void answerApproval(index, option); }}
-                >{option.length > 48 ? `${option.slice(0, 45)}...` : option}</Button>
+                >{approvalShortLabel(option)}</Button>
               {/each}
             </div>
           {/if}
@@ -647,21 +648,10 @@
         aria-label="Attach image"
         onclick={() => fileInput.click()}
       >
-        <svg class="button-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-          <rect x="3" y="4" width="18" height="16" rx="2"></rect>
-          <circle cx="8.5" cy="9" r="1.5"></circle>
-          <path d="m4 17 4.5-4.5 3.5 3.5 2.5-2.5L20 19"></path>
+        <svg class="button-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M12 5v14M5 12h14"></path>
         </svg>
       </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        class="composer-slash"
-        disabled={inputLocked || sendingPrompt}
-        aria-label="Commands"
-        title="Insert a slash command"
-        onclick={() => { void openCommands(); }}
-      >/</Button>
       <div class:has-text={Boolean(composer)} class="composer-field">
         <textarea
           bind:this={composerElement}
@@ -679,6 +669,14 @@
           onpaste={paste}
         ></textarea>
         {#if composer}<button type="button" class="input-clear" aria-label="Clear prompt text" onclick={clearComposer}>×</button>{/if}
+        <button
+          type="button"
+          class="composer-slash"
+          disabled={inputLocked || sendingPrompt}
+          aria-label="Commands"
+          title="Insert a slash command"
+          onclick={() => { void openCommands(); }}
+        >/</button>
       </div>
       {#if working}
         <Button

@@ -90,6 +90,21 @@ export function agentTitle(agent: Partial<Agent>): string {
   return tabName(agent) || String(agent.agent || '').trim() || displayName(agent);
 }
 
+/**
+ * A button-sized label for an approval option. Claude Code's long variants
+ * ("Yes, and switch to auto mode · auto mode handles these prompts for you")
+ * wrap three lines on a phone; the decision they carry fits in two words.
+ */
+export function approvalShortLabel(option: string): string {
+  const text = String(option || '').replace(/\s*[·•].*$/, '').trim();
+  const lower = text.toLowerCase();
+  if (/^yes, and (switch to )?auto mode/.test(lower)) return 'Auto mode';
+  if (/^yes, and (always allow|don'?t ask again)/.test(lower)) return 'Always allow';
+  if (/^yes, and add/.test(lower)) return 'Allow always';
+  if (/^yes, and/.test(lower)) return text.replace(/^yes, and\s*/i, '').replace(/^\w/, (c) => c.toUpperCase()).slice(0, 24);
+  return text.length > 26 ? `${text.slice(0, 23)}…` : text;
+}
+
 export function displayName(agent: Partial<Agent>): string {
   return String(agent.project || agent.name || agent.tab_label || agent.agent || 'agent');
 }

@@ -4056,6 +4056,7 @@ test('scales the whole interface from accessible settings', async ({ page }) => 
 
   await sizes.getByRole('button', { name: 'Compact' }).click();
   const compactHeadingSize = await heading.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
+  await page.locator('summary', { hasText: 'Add a relay' }).click();
   const compactInputSize = await page.getByLabel('Relay Name').evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
   await page.getByLabel('Relay Name').focus();
   expect(compactInputSize).toBeGreaterThanOrEqual(16);
@@ -5962,5 +5963,33 @@ test('renames an agent from the sheet behind its title', async ({ page }) => {
   await sheet.getByRole('button', { name: 'Save' }).click();
   await expect.poll(async () => (await commands(page)).find((command) => command.type === 'agent_rename'))
     .toMatchObject({ pane_id: 'w1:p1', name: 'Sitemap v2' });
+  await expect(sheet).toBeHidden();
+});
+
+test('drags a sheet down to dismiss it', async ({ page }) => {
+  await boot(page, [fedora]);
+  await expect.poll(() => socketCount(page)).toBe(1);
+  await handshake(page, 0, { capabilities: ['attention_classification', 'conversation_history'] });
+  await setConversationFixture(page, { entries: [], total: 0 });
+  await server(page, 0, {
+    type: 'agents',
+    agents: [{ pane_id: 'w1:p1', status: 'idle', project: 'Sheet app', agent: 'claude', tab_label: 'Sheet', session: 'abc', conversation_history_available: true }],
+  });
+  await page.getByRole('button', { name: 'Open Sheet app on Fedora' }).click();
+  await page.locator('.mode-switch').getByRole('button', { name: 'Chat' }).click();
+  await page.getByRole('button', { name: 'Agent details' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Agent' });
+  await expect(sheet).toBeVisible();
+
+  // A short, slow drag springs back; a long one closes the sheet.
+  const grabber = sheet.locator('.sheet-grabber');
+  await grabber.dispatchEvent('pointerdown', { clientY: 500, pointerType: 'touch', pointerId: 1 });
+  await grabber.dispatchEvent('pointermove', { clientY: 540, pointerType: 'touch', pointerId: 1 });
+  await grabber.dispatchEvent('pointerup', { clientY: 540, pointerType: 'touch', pointerId: 1 });
+  await expect(sheet).toBeVisible();
+  await grabber.dispatchEvent('pointerdown', { clientY: 500, pointerType: 'touch', pointerId: 1 });
+  await grabber.dispatchEvent('pointermove', { clientY: 700, pointerType: 'touch', pointerId: 1 });
+  await grabber.dispatchEvent('pointermove', { clientY: 860, pointerType: 'touch', pointerId: 1 });
+  await grabber.dispatchEvent('pointerup', { clientY: 860, pointerType: 'touch', pointerId: 1 });
   await expect(sheet).toBeHidden();
 });
