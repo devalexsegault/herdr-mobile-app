@@ -665,3 +665,144 @@ func readNextJSON(t *testing.T, conn *websocket.Conn, ctx context.Context) map[s
 	}
 	return msg
 }
+
+// TestPushAgentPreferencesRouteNotifications drives the real relay the way the
+// phone does: subscribe, then follow or mute one pane, and read back what the
+// relay stored. Per-agent routing only earns its keep if it survives this
+// round trip, which unit tests on the manager cannot prove.
+func TestPushAgentPreferencesRouteNotifications(t *testing.T) {
+	env := setupEnv(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	conn, _, err := websocket.Dial(ctx, env.wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer conn.Close(websocket.StatusNormalClosure, "")
+	readNextJSON(t, conn, ctx)
+
+	const clientID = "device-1:relay-a"
+	subscribe, err := json.Marshal(map[string]any{
+		"type":       "push_subscribe",
+		"protocol":   2,
+		"client_id":  clientID,
+		"user_agent": "test",
+		"subscription": map[string]any{
+			"endpoint": "https://push.example/endpoint-1",
+			"keys":     map[string]string{"p256dh": "p", "auth": "a"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Write(ctx, websocket.MessageText, subscribe); err != nil {
+		t.Fatal(err)
+	}
+	if reply := readUntilType(t, conn, ctx, "push_subscribed"); reply["ok"] != true {
+		t.Fatalf("push_subscribed = %+v", reply)
+	}
+
+	// Mute one pane: the relay answers with the whole map it stored.
+	prefs, err := json.Marshal(map[string]any{
+		"type":             "push_agent_prefs",
+		"protocol":         2,
+		"client_id":        clientID,
+		"pane_id":          "pane-1",
+		"push_agent_state": "mute",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Write(ctx, websocket.MessageText, prefs); err != nil {
+		t.Fatal(err)
+	}
+	reply := readUntilType(t, conn, ctx, "push_agent_prefs_result")
+	if reply["ok"] != true {
+		t.Fatalf("push_agent_prefs_result = %+v", reply)
+	}
+	agents, _ := reply["agents"].(map[string]any)
+	if agents["pane-1"] != "mute" {
+		t.Fatalf("stored agents = %+v", reply["agents"])
+	}
+
+	// Switch the whole subscription to "only followed" and follow another pane.
+	for _, message := range []map[string]any{
+		{"type": "push_agent_prefs", "protocol": 2, "client_id": clientID, "push_agent_mode": "followed"},
+		{"type": "push_agent_prefs", "protocol": 2, "client_id": clientID, "pane_id": "pane-2", "push_agent_state": "follow"},
+	} {
+		payload, marshalErr := json.Marshal(message)
+		if marshalErr != nil {
+			t.Fatal(marshalErr)
+		}
+		if writeErr := conn.Write(ctx, websocket.MessageText, payload); writeErr != nil {
+			t.Fatal(writeErr)
+		}
+		if answer := readUntilType(t, conn, ctx, "push_agent_prefs_result"); answer["ok"] != true {
+			t.Fatalf("push_agent_prefs_result = %+v", answer)
+		}
+	}
+
+	// What the relay persisted is what a restart would route on.
+	stored := readStoredSubscriptions(t, env)
+	if len(stored) != 1 {
+		t.Fatalf("subscriptions = %+v", stored)
+	}
+	if stored[0].AgentMode != "followed" {
+		t.Fatalf("agent mode = %q", stored[0].AgentMode)
+	}
+	if stored[0].Agents["pane-1"] != "mute" || stored[0].Agents["pane-2"] != "follow" {
+		t.Fatalf("agents = %+v", stored[0].Agents)
+	}
+}
+
+func readUntilType(t *testing.T, conn *websocket.Conn, ctx context.Context, want string) map[string]any {
+	t.Helper()
+	for attempt := 0; attempt < 40; attempt++ {
+		message := readNextJSON(t, conn, ctx)
+		if message["type"] == want {
+			return message
+		}
+	}
+	t.Fatalf("no %s message arrived", want)
+	return nil
+}
+
+type storedSubscription struct {
+	ClientID  string            `json:"client_id"`
+	AgentMode string            `json:"agent_mode"`
+	Agents    map[string]string `json:"agents"`
+}
+
+func readStoredSubscriptions(t *testing.T, env *TestEnv) []storedSubscription {
+	t.Helper()
+	matches, err := filepath.Glob(filepath.Join(env.tmpDir, "config", "**", "push", "subscriptions.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(matches) == 0 {
+		found := []string{}
+		_ = filepath.WalkDir(filepath.Join(env.tmpDir, "config"), func(path string, entry os.DirEntry, walkErr error) error {
+			if walkErr == nil && entry != nil && entry.Name() == "subscriptions.json" {
+				found = append(found, path)
+			}
+			return nil
+		})
+		matches = found
+	}
+	if len(matches) == 0 {
+		t.Fatal("the relay stored no push subscriptions file")
+	}
+	data, err := os.ReadFile(matches[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var file struct {
+		Subscriptions []storedSubscription `json:"subscriptions"`
+	}
+	if err := json.Unmarshal(data, &file); err != nil {
+		t.Fatal(err)
+	}
+	return file.Subscriptions
+}
