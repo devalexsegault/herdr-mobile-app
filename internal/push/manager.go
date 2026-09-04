@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math/big"
@@ -32,6 +33,12 @@ type Subscription struct {
 	UserAgent      string `json:"user_agent,omitempty"`
 	NotifyFinished bool   `json:"notify_finished,omitempty"`
 	ClientID       string `json:"client_id,omitempty"`
+	// AgentMode governs the agents Agents does not name: "all" (the default)
+	// notifies for every agent, "followed" only for the ones marked follow.
+	// An approval loop on a big feature is exactly what "followed" is for.
+	AgentMode string `json:"agent_mode,omitempty"`
+	// Agents maps a pane id to "follow" or "mute"; anything else is dropped.
+	Agents map[string]string `json:"agents,omitempty"`
 }
 
 // pythonSubscription matches the Python relay's on-disk format:
@@ -44,9 +51,11 @@ type pythonSubscription struct {
 			Auth   string `json:"auth"`
 		} `json:"keys"`
 	} `json:"subscription"`
-	ClientID       string `json:"client_id"`
-	UserAgent      string `json:"user_agent"`
-	NotifyFinished bool   `json:"notify_finished"`
+	ClientID       string            `json:"client_id"`
+	UserAgent      string            `json:"user_agent"`
+	NotifyFinished bool              `json:"notify_finished"`
+	AgentMode      string            `json:"agent_mode,omitempty"`
+	Agents         map[string]string `json:"agents,omitempty"`
 }
 
 type pythonFile struct {
@@ -303,6 +312,8 @@ func (m *Manager) load() error {
 			sub.UserAgent = ps.UserAgent
 			sub.NotifyFinished = ps.NotifyFinished
 			sub.ClientID = ps.ClientID
+			sub.AgentMode = ps.AgentMode
+			sub.Agents = ps.Agents
 			m.subscriptions = append(m.subscriptions, sub)
 		}
 		return nil
@@ -322,6 +333,8 @@ func (m *Manager) persist(subscriptions []Subscription) error {
 		ps.UserAgent = sub.UserAgent
 		ps.NotifyFinished = sub.NotifyFinished
 		ps.ClientID = sub.ClientID
+		ps.AgentMode = sub.AgentMode
+		ps.Agents = sub.Agents
 		pf.Subscriptions = append(pf.Subscriptions, ps)
 	}
 
@@ -421,9 +434,13 @@ func (m *Manager) Send(ctx context.Context, payload []byte) {
 	}
 
 	finished := payloadType(payload) == "finished"
+	pane := payloadPane(payload)
 	var toRemove []string
 	for _, sub := range subs {
 		if finished && !sub.NotifyFinished {
+			continue
+		}
+		if !sub.wants(pane) {
 			continue
 		}
 		if err := m.sendPush(ctx, sub, payload); err != nil {
@@ -440,6 +457,90 @@ func (m *Manager) Send(ctx context.Context, payload []byte) {
 		}
 		m.logger.Info("pruned dead push subscriptions", "count", len(toRemove))
 	}
+}
+
+// wants reports whether this subscription should hear about a pane. A pane it
+// names wins over the mode; an unnamed pane follows the mode.
+func (s Subscription) wants(pane string) bool {
+	if pane == "" {
+		return true
+	}
+	switch s.Agents[pane] {
+	case "mute":
+		return false
+	case "follow":
+		return true
+	}
+	return s.AgentMode != "followed"
+}
+
+// SetAgentPreference records what one client wants for one pane: "follow",
+// "mute", or "" to fall back to the client's mode.
+func (m *Manager) SetAgentPreference(clientID, pane, state string) (Subscription, error) {
+	if clientID == "" || pane == "" {
+		return Subscription{}, errors.New("client and pane are required")
+	}
+	switch state {
+	case "", "follow", "mute":
+	default:
+		return Subscription{}, errors.New("state must be follow, mute, or empty")
+	}
+	return m.updateClient(clientID, func(sub *Subscription) {
+		if state == "" {
+			delete(sub.Agents, pane)
+			return
+		}
+		if sub.Agents == nil {
+			sub.Agents = map[string]string{}
+		}
+		sub.Agents[pane] = state
+	})
+}
+
+// SetAgentMode records whether a client hears about every agent or only the
+// ones it follows.
+func (m *Manager) SetAgentMode(clientID, mode string) (Subscription, error) {
+	if clientID == "" {
+		return Subscription{}, errors.New("client is required")
+	}
+	switch mode {
+	case "", "all":
+		mode = ""
+	case "followed":
+	default:
+		return Subscription{}, errors.New("mode must be all or followed")
+	}
+	return m.updateClient(clientID, func(sub *Subscription) { sub.AgentMode = mode })
+}
+
+func (m *Manager) updateClient(clientID string, apply func(*Subscription)) (Subscription, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	found := false
+	var updated Subscription
+	for index := range m.subscriptions {
+		if m.subscriptions[index].ClientID != clientID {
+			continue
+		}
+		apply(&m.subscriptions[index])
+		updated = m.subscriptions[index]
+		found = true
+	}
+	if !found {
+		return Subscription{}, errors.New("no push subscription for this client")
+	}
+	if err := m.persist(m.subscriptions); err != nil {
+		return Subscription{}, err
+	}
+	return updated, nil
+}
+
+func payloadPane(payload []byte) string {
+	var envelope struct {
+		PaneID string `json:"pane_id"`
+	}
+	_ = json.Unmarshal(payload, &envelope)
+	return envelope.PaneID
 }
 
 func payloadType(payload []byte) string {
@@ -598,6 +699,7 @@ func BuildAttentionPayload(
 		"title":       title,
 		"body":        body,
 		"tag":         fmt.Sprintf("herdr-%s-%s", host, paneID),
+		"pane_id":     paneID,
 		"url":         notifyURL,
 		"actions":     []any{},
 		"action_urls": map[string]string{},
@@ -630,6 +732,7 @@ func BuildFinishedPayload(agent, project, paneID, host, eventID string) []byte {
 		"title":       fmt.Sprintf("%s finished", project),
 		"body":        fmt.Sprintf("%s completed · %s", agent, host),
 		"tag":         fmt.Sprintf("herdr-finished-%s-%s", host, paneID),
+		"pane_id":     paneID,
 		"url":         notifyURL,
 		"actions":     []any{},
 		"action_urls": map[string]string{},

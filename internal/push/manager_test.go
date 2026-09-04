@@ -488,3 +488,61 @@ func TestParseVAPIDPrivatePadsScalarTo32Bytes(t *testing.T) {
 		t.Fatalf("scalar = %x", scalar)
 	}
 }
+
+func TestSubscriptionWantsFollowsAndMutes(t *testing.T) {
+	all := Subscription{}
+	if !all.wants("w1:p1") {
+		t.Fatal("the default mode notifies for every agent")
+	}
+	muted := Subscription{Agents: map[string]string{"w1:p1": "mute"}}
+	if muted.wants("w1:p1") || !muted.wants("w1:p2") {
+		t.Fatal("a muted pane is silent, the others are not")
+	}
+	// An approval loop is why "followed" exists: silence by default, and the
+	// one agent worth watching still gets through.
+	followed := Subscription{AgentMode: "followed", Agents: map[string]string{"w1:p2": "follow"}}
+	if followed.wants("w1:p1") || !followed.wants("w1:p2") {
+		t.Fatal("followed mode notifies only for followed panes")
+	}
+	if !followed.wants("") {
+		t.Fatal("a payload without a pane is never filtered out")
+	}
+}
+
+func TestManagerRecordsAgentPreferences(t *testing.T) {
+	manager, err := NewManager(t.TempDir(), testLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sub := Subscription{Endpoint: "https://push.example/a", ClientID: "device-1"}
+	sub.Keys.P256dh = "p"
+	sub.Keys.Auth = "a"
+	if err := manager.Subscribe(sub); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.SetAgentMode("device-1", "followed"); err != nil {
+		t.Fatal(err)
+	}
+	updated, prefErr := manager.SetAgentPreference("device-1", "w1:p1", "follow")
+	if prefErr != nil {
+		t.Fatal(err)
+	}
+	if updated.AgentMode != "followed" || updated.Agents["w1:p1"] != "follow" {
+		t.Fatalf("subscription = %+v", updated)
+	}
+	_ = err
+	// Clearing a pane returns it to whatever the mode says.
+	cleared, clearErr := manager.SetAgentPreference("device-1", "w1:p1", "")
+	if clearErr != nil {
+		t.Fatal(clearErr)
+	}
+	if _, exists := cleared.Agents["w1:p1"]; exists {
+		t.Fatalf("cleared subscription = %+v", cleared)
+	}
+	if _, err := manager.SetAgentPreference("someone-else", "w1:p1", "follow"); err == nil {
+		t.Fatal("an unknown client must not create a subscription")
+	}
+	if _, err := manager.SetAgentMode("device-1", "sometimes"); err == nil {
+		t.Fatal("an unknown mode must be refused")
+	}
+}

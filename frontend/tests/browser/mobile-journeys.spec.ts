@@ -85,6 +85,22 @@ async function boot(page: Page, relays: RelayFixture[] = [], path = '/', options
           }));
           return;
         }
+        if (message.type === 'push_agent_prefs') {
+          const prefs = Reflect.get(window, '__pushPrefs') as { mode: string; agents: Record<string, string> } | undefined
+            || { mode: 'all', agents: {} };
+          if (typeof message.push_agent_mode === 'string' && message.push_agent_mode) prefs.mode = message.push_agent_mode;
+          if (typeof message.pane_id === 'string' && message.pane_id) {
+            if (typeof message.push_agent_state === 'string' && message.push_agent_state) {
+              prefs.agents[message.pane_id] = message.push_agent_state;
+            }
+            else delete prefs.agents[message.pane_id];
+          }
+          Reflect.set(window, '__pushPrefs', prefs);
+          queueMicrotask(() => this.server({
+            type: 'push_agent_prefs_result', ok: true, mode: prefs.mode, agents: { ...prefs.agents },
+          }));
+          return;
+        }
         if (message.type === 'list_slash_commands') {
           queueMicrotask(() => this.server({
             type: 'command_result', request_id: message.request_id, ok: true, phase: 'completed',
@@ -6000,4 +6016,55 @@ test('drags a sheet down to dismiss it', async ({ page }) => {
   await grabber.dispatchEvent('pointermove', { clientY: 860, pointerType: 'touch', pointerId: 1 });
   await grabber.dispatchEvent('pointerup', { clientY: 860, pointerType: 'touch', pointerId: 1 });
   await expect(sheet).toBeHidden();
+});
+
+test('mutes one agent and follows another for push', async ({ page }) => {
+  await boot(page, [fedora]);
+  await expect.poll(() => socketCount(page)).toBe(1);
+  await handshake(page, 0, { capabilities: ['attention_classification', 'conversation_history'] });
+  await setConversationFixture(page, { entries: [], total: 0 });
+  await server(page, 0, {
+    type: 'agents',
+    agents: [
+      { pane_id: 'w1:p1', status: 'working', project: 'Loop app', agent: 'claude', tab_label: 'Approval loop', conversation_history_available: true },
+      { pane_id: 'w1:p2', status: 'working', project: 'Other app', agent: 'claude', tab_label: 'Small fix', conversation_history_available: true },
+    ],
+  });
+
+  // A long-running approval loop gets muted from its own sheet.
+  await page.getByRole('button', { name: 'Open Loop app on Fedora' }).click();
+  await page.locator('.mode-switch').getByRole('button', { name: 'Chat' }).click();
+  await page.getByRole('button', { name: 'Agent details' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Agent' });
+  const notify = sheet.getByRole('switch', { name: 'Notify me about this agent' });
+  await expect(notify).toHaveAttribute('aria-checked', 'true');
+  await notify.click();
+  await expect.poll(async () => (await commands(page)).find((command) => command.type === 'push_agent_prefs'))
+    .toMatchObject({ pane_id: 'w1:p1', push_agent_state: 'mute' });
+  await expect(notify).toHaveAttribute('aria-checked', 'false');
+
+  // Settings shows it, and can switch the relay to "only followed".
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Back' }).click();
+  await page.getByRole('navigation', { name: 'Sections' }).getByRole('button', { name: /^Settings/ }).click();
+  const routing = page.getByLabel('Which agents notify on Fedora');
+  await expect(routing).toContainText('Muted');
+  await expect(routing).toContainText('Approval loop');
+  await routing.getByRole('button', { name: /^Only followed/ }).click();
+  await expect.poll(async () => (await commands(page))
+    .filter((command) => command.type === 'push_agent_prefs')
+    .map((command) => (command as { push_agent_mode?: string }).push_agent_mode)).toContain('followed');
+
+  // In that mode the switch follows an agent instead of muting it.
+  await page.getByRole('navigation', { name: 'Sections' }).getByRole('button', { name: 'Today', exact: true }).click();
+  await page.getByRole('button', { name: 'Open Other app on Fedora' }).click();
+  await page.locator('.mode-switch').getByRole('button', { name: 'Chat' }).click();
+  await page.getByRole('button', { name: 'Agent details' }).click();
+  const second = page.getByRole('dialog', { name: 'Agent' });
+  const followSwitch = second.getByRole('switch', { name: 'Notify me about this agent' });
+  await expect(followSwitch).toHaveAttribute('aria-checked', 'false');
+  await followSwitch.click();
+  await expect.poll(async () => (await commands(page)).filter((command) => command.type === 'push_agent_prefs').at(-1))
+    .toMatchObject({ pane_id: 'w1:p2', push_agent_state: 'follow' });
+  await expect(followSwitch).toHaveAttribute('aria-checked', 'true');
 });

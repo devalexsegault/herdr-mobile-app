@@ -39,6 +39,10 @@
     notificationsSupported,
     pushPreferences,
     pushSupported,
+    agentPushMode,
+    agentPushPreferences,
+    setAgentPushMode,
+    setAgentPushState,
     refreshPushPreferences,
     removeRelayPushSubscription,
     setFinishedNotifications,
@@ -50,6 +54,7 @@
     securityState,
     setDeviceVerificationRequired,
   } from '$lib/security';
+  import { agentTitle } from '$lib/agents';
   import { relayStore } from '$lib/store';
   import {
     appUpdateStatus,
@@ -285,6 +290,24 @@
     await removeRelayPushSubscription(relayId);
     relayStore.removeRelay(relayId);
     removalRelayId = '';
+  }
+
+  // Push routing per relay, read back from the relay's own answer.
+  function pushRouting(relayId: string): { mode: 'all' | 'followed'; followed: string[]; muted: string[] } {
+    void $agentPushPreferences;
+    const entry = $agentPushPreferences.get(relayId);
+    const agents = entry?.agents || {};
+    return {
+      mode: agentPushMode(relayId),
+      followed: Object.keys(agents).filter((pane) => agents[pane] === 'follow').sort(),
+      muted: Object.keys(agents).filter((pane) => agents[pane] === 'mute').sort(),
+    };
+  }
+
+  // The relay stores raw pane ids; show the agent's name when it is connected.
+  function agentLabelFor(relayId: string, rawPaneId: string): string {
+    const match = $agents.find((agent) => agent.relay_id === relayId && agent.raw_pane_id === rawPaneId);
+    return match ? agentTitle(match) : rawPaneId;
   }
 
   async function changeFinished(value: boolean) {
@@ -664,6 +687,59 @@
     />
     <p class="hint" id="finished-notification-hint">Optional. Blocked-agent notifications remain enabled whenever push is active.</p>
     <p class="hint" role="status">{notification.hint}</p>
+
+    {#each relayRows as { relay, connection } (relay.id)}
+      {#if connection?.status === 'connected'}
+        {@const mode = pushRouting(relay.id).mode}
+        {@const followed = pushRouting(relay.id).followed}
+        {@const muted = pushRouting(relay.id).muted}
+        <div class="push-routing" aria-label={`Which agents notify on ${relay.label}`}>
+          <span class="field-label">{relay.label}: which agents notify</span>
+          <div class="choice-grid settings-grid" role="group" aria-label={`Notify for ${relay.label}`}>
+            <button
+              type="button"
+              class="choice"
+              class:active={mode === 'all'}
+              aria-pressed={mode === 'all'}
+              onclick={() => setAgentPushMode(relay.id, 'all')}
+            >
+              <strong>Every agent</strong>
+              <small>Except the ones you mute.</small>
+            </button>
+            <button
+              type="button"
+              class="choice"
+              class:active={mode === 'followed'}
+              aria-pressed={mode === 'followed'}
+              onclick={() => setAgentPushMode(relay.id, 'followed')}
+            >
+              <strong>Only followed</strong>
+              <small>Silent unless you follow an agent.</small>
+            </button>
+          </div>
+          {#if followed.length || muted.length}
+            <ul class="push-routing-list">
+              {#each followed as paneId (paneId)}
+                <li>
+                  <span class="push-routing-state">Followed</span>
+                  <span class="push-routing-agent">{agentLabelFor(relay.id, paneId)}</span>
+                  <button type="button" class="link-button" onclick={() => setAgentPushState(relay.id, paneId, '')}>Clear</button>
+                </li>
+              {/each}
+              {#each muted as paneId (paneId)}
+                <li>
+                  <span class="push-routing-state muted">Muted</span>
+                  <span class="push-routing-agent">{agentLabelFor(relay.id, paneId)}</span>
+                  <button type="button" class="link-button" onclick={() => setAgentPushState(relay.id, paneId, '')}>Clear</button>
+                </li>
+              {/each}
+            </ul>
+          {:else}
+            <p class="hint">Follow or mute an agent from its sheet: tap the title in its conversation, or long-press it on Today.</p>
+          {/if}
+        </div>
+      {/if}
+    {/each}
   </Card>
 
   <Card>

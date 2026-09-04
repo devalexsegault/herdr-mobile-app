@@ -2,6 +2,7 @@
   import AppDialog from '$components/ui/AppDialog.svelte';
   import Button from '$components/ui/Button.svelte';
   import { hostLabel, tabName } from '$lib/agents';
+  import { agentNotifies, agentPushMode, agentPushPreferences, setAgentPushState } from '$lib/push';
   import { navigate, replaceView } from '$lib/router';
   import { relayStore } from '$lib/store';
   import type { Agent } from '$lib/types';
@@ -24,6 +25,27 @@
   });
 
   const currentName = $derived(agent ? tabName(agent) : '');
+  // Push routing for this agent. The store is the relay's answer, so the
+  // switch shows what the relay will actually do, not what was asked.
+  const prefs = agentPushPreferences;
+  const notifies = $derived.by(() => {
+    void $prefs;
+    return agent ? agentNotifies(agent.relay_id, agent.raw_pane_id) : false;
+  });
+  const followedOnly = $derived.by(() => {
+    void $prefs;
+    return agent ? agentPushMode(agent.relay_id) === 'followed' : false;
+  });
+
+  function toggleNotify() {
+    if (!agent) return;
+    // In "followed only" mode the switch adds or removes a follow; otherwise
+    // it mutes or un-mutes, so one tap always means what it looks like.
+    const next = followedOnly
+      ? (notifies ? '' : 'follow')
+      : (notifies ? 'mute' : '');
+    setAgentPushState(agent.relay_id, agent.raw_pane_id, next as 'follow' | 'mute' | '');
+  }
   const changed = $derived(name.trim() !== '' && name.trim() !== currentName);
 
   async function save() {
@@ -88,6 +110,16 @@
         {#if agent.herdr_session}<div class="sheet-row" role="listitem"><span>Session</span><strong>{agent.herdr_session}</strong></div>{/if}
         {#if agent.cwd}<div class="sheet-row" role="listitem"><span>Folder</span><strong class="sheet-path">{agent.cwd}</strong></div>{/if}
       </div>
+
+      <div class="sheet-rows">
+        <button type="button" class="sheet-action switch-action" role="switch" aria-checked={notifies} onclick={toggleNotify}>
+          <span>Notify me about this agent</span>
+          <span class="switch-track" class:on={notifies} aria-hidden="true"><span class="switch-thumb"></span></span>
+        </button>
+      </div>
+      {#if followedOnly}
+        <p class="hint">This relay only notifies for the agents you follow.</p>
+      {/if}
 
       <div class="sheet-rows">
         <button type="button" class="sheet-action" onclick={openChat}>Open chat</button>

@@ -1411,3 +1411,20 @@ textarea { min-height: 6.5rem; resize: vertical; }
 /* The model picker's free-text row, for an alias the shortlist does not carry. */
 .model-other { align-items: center; display: flex; gap: .5rem; }
 .model-other input { flex: 1; min-width: 0; }
+
+/* A row that is a switch: label left, track right, the whole row tappable. */
+.switch-action { align-items: center; display: flex; gap: .75rem; justify-content: space-between; }
+.switch-track { background: var(--border); border-radius: 999px; flex: 0 0 auto; height: 1.6rem; position: relative; transition: background .16s ease; width: 2.75rem; }
+.switch-track.on { background: var(--success); }
+.switch-thumb { background: #fff; border-radius: 50%; box-shadow: 0 1px 3px rgb(0 0 0 / .3); height: 1.3rem; left: .15rem; position: absolute; top: .15rem; transition: transform .16s ease; width: 1.3rem; }
+.switch-track.on .switch-thumb { transform: translateX(1.15rem); }
+
+/* Which agents notify, per relay. */
+.push-routing { display: flex; flex-direction: column; gap: .5rem; margin-top: .9rem; }
+.push-routing .choice-grid { margin: 0; }
+.push-routing-list { display: flex; flex-direction: column; gap: .3rem; list-style: none; margin: 0; padding: 0; }
+.push-routing-list li { align-items: center; display: flex; gap: .5rem; min-height: 2.4rem; }
+.push-routing-state { background: color-mix(in srgb, var(--success) 18%, transparent); border-radius: .4rem; color: var(--success); font-size: .68rem; font-weight: 650; padding: .12rem .4rem; }
+.push-routing-state.muted { background: var(--secondary); color: var(--muted); }
+.push-routing-agent { flex: 1; font-size: .85rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.link-button { appearance: none; background: transparent; border: 0; color: var(--primary); cursor: pointer; font: inherit; font-size: .82rem; font-weight: 550; padding: .4rem .2rem; }

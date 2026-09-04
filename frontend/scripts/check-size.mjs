@@ -54,7 +54,10 @@ import { constants, gzipSync } from 'node:zlib';
 // collapsing large title, bottom-sheet dialogs, inset-grouped lists, the
 // agent sheet with rename and the edge-swipe handler add 1,706 B gzip over
 // the 0.20.9 bundle, which sat exactly at the ceiling.
-const limitKiB = 152;
+// Raised from 152 KiB for per-agent push routing (0.20.13): the agent sheet's
+// notify switch, the per-relay routing section in Settings and the store that
+// mirrors the relay's answer add 996 B gzip with no headroom left.
+const limitKiB = 154;
 const limit = limitKiB * 1024;
 const root = resolve(process.argv[2] || 'dist');
 const files = ['index.html', 'assets/app.js', 'assets/app.css'];

@@ -19,6 +19,45 @@ export interface PushPreferences {
   finished: boolean;
 }
 
+/** What one relay's push subscription does per agent. */
+export interface AgentPushPreferences {
+  /** 'all' notifies for every agent; 'followed' only for followed panes. */
+  mode: 'all' | 'followed';
+  /** Pane id (as the relay knows it) to 'follow' or 'mute'. */
+  agents: Record<string, 'follow' | 'mute'>;
+}
+
+/**
+ * Per-agent push, kept by the relay and mirrored in the store. An approval
+ * loop on a big feature runs for hours and would notify at every step, so an
+ * agent can be muted on its own, or a relay switched to "only what I follow".
+ */
+export const agentPushPreferences = relayStore.agentPushPrefs;
+
+export function agentPushState(relayId: string, rawPaneId: string): 'follow' | 'mute' | '' {
+  return get(agentPushPreferences).get(relayId)?.agents[rawPaneId] || '';
+}
+
+export function agentPushMode(relayId: string): 'all' | 'followed' {
+  return get(agentPushPreferences).get(relayId)?.mode || 'all';
+}
+
+/** Whether this agent would notify, mode and per-agent choice combined. */
+export function agentNotifies(relayId: string, rawPaneId: string): boolean {
+  const state = agentPushState(relayId, rawPaneId);
+  if (state === 'mute') return false;
+  if (state === 'follow') return true;
+  return agentPushMode(relayId) === 'all';
+}
+
+export function setAgentPushState(relayId: string, rawPaneId: string, state: 'follow' | 'mute' | ''): void {
+  relayStore.setAgentPushPreference(relayId, { paneId: rawPaneId, state });
+}
+
+export function setAgentPushMode(relayId: string, mode: 'all' | 'followed'): void {
+  relayStore.setAgentPushPreference(relayId, { mode });
+}
+
 export function notificationsSupported(): boolean {
   return 'Notification' in window;
 }

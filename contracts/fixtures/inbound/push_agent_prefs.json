@@ -1,0 +1,8 @@
+{
+  "type": "push_agent_prefs",
+  "protocol": 2,
+  "client_id": "device-1:relay-a",
+  "pane_id": "w1:p1",
+  "push_agent_state": "follow",
+  "push_agent_mode": "followed"
+}

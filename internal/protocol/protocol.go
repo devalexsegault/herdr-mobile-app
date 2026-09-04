@@ -21,6 +21,7 @@ var mutatingTypes = map[string]bool{
 	"clarify_question":    true,
 	"push_subscribe":      true,
 	"push_unsubscribe":    true,
+	"push_agent_prefs":    true,
 	"submit_prompt":       true,
 	"prompt":              true,
 	"send_keys":           true,
@@ -72,45 +73,49 @@ type Inbound struct {
 	// HerdrSession names the Herdr session a start or a workspace creation
 	// targets. Empty means the base session; ids the phone already holds carry
 	// their session and need no hint.
-	HerdrSession      string          `json:"herdr_session,omitempty"`
-	Label             string          `json:"label,omitempty"`
-	WorkspaceID       string          `json:"workspace_id,omitempty"`
-	WorkspaceIDs      []string        `json:"workspace_ids,omitempty"`
-	BeforeWorkspaceID string          `json:"before_workspace_id,omitempty"`
-	Branch            string          `json:"branch,omitempty"`
-	Base              string          `json:"base,omitempty"`
-	Force             bool            `json:"force,omitempty"`
-	Cwd               string          `json:"cwd,omitempty"`
-	Prompt            string          `json:"prompt,omitempty"`
-	EventID           string          `json:"event_id,omitempty"`
-	InteractionID     string          `json:"interaction_id,omitempty"`
-	InsertIndex       *int            `json:"insert_index,omitempty"`
-	Index             *int            `json:"index,omitempty"`
-	Total             *int            `json:"total,omitempty"`
-	Keys              []string        `json:"keys,omitempty"`
-	SelectedIndices   []int           `json:"selected_indices,omitempty"`
-	OtherSelected     bool            `json:"other_selected,omitempty"`
-	OtherText         string          `json:"other_text,omitempty"`
-	Direction         string          `json:"direction,omitempty"`
-	Lines             int             `json:"lines,omitempty"`
-	Before            string          `json:"before,omitempty"`
-	Limit             int             `json:"limit,omitempty"`
-	Columns           int             `json:"columns,omitempty"`
-	Rows              int             `json:"rows,omitempty"`
-	Format            string          `json:"format,omitempty"`
-	Path              string          `json:"path,omitempty"`
-	Filename          string          `json:"filename,omitempty"`
-	MIME              string          `json:"mime,omitempty"`
-	Data              string          `json:"data,omitempty"`
-	ClientID          string          `json:"client_id,omitempty"`
-	ReplaceEndpoints  []string        `json:"replace_endpoints,omitempty"`
-	NotifyFinished    bool            `json:"notify_finished,omitempty"`
-	Endpoints         []string        `json:"endpoints,omitempty"`
-	Origin            string          `json:"origin,omitempty"`
-	ExpectedOrigin    string          `json:"expected_origin,omitempty"`
-	ExpectedVersion   string          `json:"expected_version,omitempty"`
-	ExpectedRevision  string          `json:"expected_revision,omitempty"`
-	Subscription      json.RawMessage `json:"subscription,omitempty"`
+	HerdrSession      string   `json:"herdr_session,omitempty"`
+	Label             string   `json:"label,omitempty"`
+	WorkspaceID       string   `json:"workspace_id,omitempty"`
+	WorkspaceIDs      []string `json:"workspace_ids,omitempty"`
+	BeforeWorkspaceID string   `json:"before_workspace_id,omitempty"`
+	Branch            string   `json:"branch,omitempty"`
+	Base              string   `json:"base,omitempty"`
+	Force             bool     `json:"force,omitempty"`
+	Cwd               string   `json:"cwd,omitempty"`
+	Prompt            string   `json:"prompt,omitempty"`
+	EventID           string   `json:"event_id,omitempty"`
+	InteractionID     string   `json:"interaction_id,omitempty"`
+	InsertIndex       *int     `json:"insert_index,omitempty"`
+	Index             *int     `json:"index,omitempty"`
+	Total             *int     `json:"total,omitempty"`
+	Keys              []string `json:"keys,omitempty"`
+	SelectedIndices   []int    `json:"selected_indices,omitempty"`
+	OtherSelected     bool     `json:"other_selected,omitempty"`
+	OtherText         string   `json:"other_text,omitempty"`
+	Direction         string   `json:"direction,omitempty"`
+	Lines             int      `json:"lines,omitempty"`
+	Before            string   `json:"before,omitempty"`
+	Limit             int      `json:"limit,omitempty"`
+	Columns           int      `json:"columns,omitempty"`
+	Rows              int      `json:"rows,omitempty"`
+	Format            string   `json:"format,omitempty"`
+	Path              string   `json:"path,omitempty"`
+	Filename          string   `json:"filename,omitempty"`
+	MIME              string   `json:"mime,omitempty"`
+	Data              string   `json:"data,omitempty"`
+	ClientID          string   `json:"client_id,omitempty"`
+	ReplaceEndpoints  []string `json:"replace_endpoints,omitempty"`
+	NotifyFinished    bool     `json:"notify_finished,omitempty"`
+	// PushAgentState follows or mutes one pane for this client's push
+	// subscription; PushAgentMode sets what unlisted panes do.
+	PushAgentState   string          `json:"push_agent_state,omitempty"`
+	PushAgentMode    string          `json:"push_agent_mode,omitempty"`
+	Endpoints        []string        `json:"endpoints,omitempty"`
+	Origin           string          `json:"origin,omitempty"`
+	ExpectedOrigin   string          `json:"expected_origin,omitempty"`
+	ExpectedVersion  string          `json:"expected_version,omitempty"`
+	ExpectedRevision string          `json:"expected_revision,omitempty"`
+	Subscription     json.RawMessage `json:"subscription,omitempty"`
 	// Method and Params carry a herdr-board protocol v1 call. They are opaque
 	// to the relay, which validates Method against its allowlist and forwards
 	// Params untouched, so the app can use boardd's documented contract
@@ -177,6 +182,8 @@ func IncompatibleResponse(message Inbound) map[string]any {
 		return map[string]any{"type": "push_subscribed", "ok": false, "error": publicError}
 	case "push_unsubscribe":
 		return map[string]any{"type": "push_unsubscribed", "ok": false, "error": publicError}
+	case "push_agent_prefs":
+		return map[string]any{"type": "push_agent_prefs_result", "ok": false, "error": publicError}
 	default:
 		return map[string]any{
 			"type":       "command_result",

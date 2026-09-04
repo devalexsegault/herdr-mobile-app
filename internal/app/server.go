@@ -686,6 +686,29 @@ func (s *Server) Run(ctx context.Context) error {
 				}
 			}
 			s.hub.Send(client, map[string]any{"type": "push_subscribed", "ok": ok})
+		case "push_agent_prefs":
+			// Per-agent push: follow or mute one pane, or set what the panes
+			// this client has not named should do.
+			result := map[string]any{"type": "push_agent_prefs_result", "ok": false}
+			if s.pushM != nil {
+				clientID := inbound.ClientID
+				var sub push.Subscription
+				var err error
+				if inbound.PushAgentMode != "" {
+					sub, err = s.pushM.SetAgentMode(clientID, inbound.PushAgentMode)
+				}
+				if err == nil && inbound.PaneID != "" {
+					sub, err = s.pushM.SetAgentPreference(clientID, inbound.PaneID, inbound.PushAgentState)
+				}
+				if err != nil {
+					result["error"] = "push preferences were not stored"
+				} else {
+					result["ok"] = true
+					result["mode"] = sub.AgentMode
+					result["agents"] = sub.Agents
+				}
+			}
+			s.hub.Send(client, result)
 		case "push_unsubscribe":
 			ok := false
 			if s.pushM != nil {

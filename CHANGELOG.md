@@ -3,6 +3,15 @@
 Notable user-facing changes to Herdr Mobile Relay are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
+## [0.20.13] - 2026-09-04
+
+### Added
+
+- Push notifications are routed per agent: an agent's sheet carries a switch
+  that mutes or follows it, and Settings offers "Only followed" per relay, so
+  a long approval loop on a big feature can run without notifying at every
+  step. The relay keeps the routing with the push subscription.
+
 ## [0.20.12] - 2026-09-03
 
 ### Added

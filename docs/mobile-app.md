@@ -290,3 +290,14 @@ sequences. When the relay advertises response copy and the agent is one of
 Claude Code, Codex, Kimi, Oh My Pi, Pi, or Qoder, it runs that agent's own copy
 command; every other case takes the visible terminal output. The agent command
 refuses a busy composer, so it cannot interrupt an in-flight turn.
+
+## Which agents notify
+
+Push notifications are routed per agent, per relay. Every agent notifies by
+default; the switch at the top of an agent's sheet mutes it, which is what a
+long approval loop on a big feature usually wants. Settings → Notifications
+also offers **Only followed** per relay: nothing notifies unless you follow an
+agent from its sheet, and the section lists what is followed or muted with a
+way to clear it. The relay stores this with the push subscription, so it
+survives reconnects and applies to blocked-agent and finished notifications
+alike.

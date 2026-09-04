@@ -271,6 +271,11 @@ class RelayStore {
   readonly agents = writable<Agent[]>([]);
   readonly workspaces = writable<RelayWorkspace[]>([]);
   readonly activities = writable<Activity[]>([]);
+  /**
+   * Per-relay push routing: which agents notify this phone. The relay owns the
+   * value and answers every change with the whole map.
+   */
+  readonly agentPushPrefs = writable<Map<string, { mode: 'all' | 'followed'; agents: Record<string, 'follow' | 'mute'> }>>(new Map());
   readonly terminalFrames = writable<Map<string, TerminalFrame>>(new Map());
   readonly responding = writable<Set<string>>(new Set());
   readonly toast = writable<ToastMessage | null>(null);
@@ -885,6 +890,22 @@ class RelayStore {
     if (message.type === 'push_subscribed' && connection) {
       connection.pushStatus = message.ok ? 'subscribed' : 'failed';
       this.emitConnections();
+      return;
+    }
+    if (message.type === 'push_agent_prefs_result') {
+      if (message.ok) {
+        const agents: Record<string, 'follow' | 'mute'> = {};
+        for (const [pane, state] of Object.entries((message.agents || {}) as Record<string, unknown>)) {
+          if (state === 'follow' || state === 'mute') agents[pane] = state;
+        }
+        this.agentPushPrefs.update((current) => {
+          const next = new Map(current);
+          next.set(relayId, { mode: message.mode === 'followed' ? 'followed' : 'all', agents });
+          return next;
+        });
+      } else if (typeof message.error === 'string' && message.error) {
+        this.showToast(message.error, true);
+      }
       return;
     }
     if (message.type === 'push_unsubscribed' && connection && message.ok) {
@@ -1748,6 +1769,23 @@ class RelayStore {
     const intervalMs = get(terminalRefreshInterval);
     if (this.connectionsValue.get(relayId)?.path !== 'gateway') return { lines, intervalMs };
     return { lines: Math.min(lines, RELAYED_HISTORY_LINES), intervalMs };
+  }
+
+  /**
+   * Follow or mute one agent for push, or set what this relay does with the
+   * agents the phone has not named. The relay answers with the whole map, so
+   * the app never guesses what it stored.
+   */
+  setAgentPushPreference(
+    relayId: string,
+    change: { paneId?: string; state?: 'follow' | 'mute' | ''; mode?: 'all' | 'followed' },
+  ): boolean {
+    return this.sendRaw(relayId, {
+      type: 'push_agent_prefs',
+      client_id: `${pushClientId()}:${relayId}`,
+      ...(change.paneId ? { pane_id: change.paneId, push_agent_state: change.state || '' } : {}),
+      ...(change.mode ? { push_agent_mode: change.mode } : {}),
+    });
   }
 
   readPane(agent: Agent, force = false): void {
