@@ -3,6 +3,13 @@
 Notable user-facing changes to Herdr Mobile Relay are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
+## [0.20.14] - 2026-09-04
+
+### Fixed
+
+- Changing which agents notify no longer fails with "incompatible app
+  protocol": the message left without the protocol version the relay checks.
+
 ## [0.20.13] - 2026-09-04
 
 ### Added

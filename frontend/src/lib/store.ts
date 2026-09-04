@@ -1782,6 +1782,7 @@ class RelayStore {
   ): boolean {
     return this.sendRaw(relayId, {
       type: 'push_agent_prefs',
+      protocol: APP_PROTOCOL_VERSION,
       client_id: `${pushClientId()}:${relayId}`,
       ...(change.paneId ? { pane_id: change.paneId, push_agent_state: change.state || '' } : {}),
       ...(change.mode ? { push_agent_mode: change.mode } : {}),

@@ -6039,8 +6039,10 @@ test('mutes one agent and follows another for push', async ({ page }) => {
   const notify = sheet.getByRole('switch', { name: 'Notify me about this agent' });
   await expect(notify).toHaveAttribute('aria-checked', 'true');
   await notify.click();
+  // The relay refuses a message without its protocol version, so the journey
+  // asserts it travels with every push preference change.
   await expect.poll(async () => (await commands(page)).find((command) => command.type === 'push_agent_prefs'))
-    .toMatchObject({ pane_id: 'w1:p1', push_agent_state: 'mute' });
+    .toMatchObject({ pane_id: 'w1:p1', push_agent_state: 'mute', protocol: 2 });
   await expect(notify).toHaveAttribute('aria-checked', 'false');
 
   // Settings shows it, and can switch the relay to "only followed".
