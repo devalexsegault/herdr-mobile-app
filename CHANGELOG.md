@@ -3,6 +3,14 @@
 Notable user-facing changes to Herdr Mobile Relay are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
+## [0.20.15] - 2026-09-04
+
+### Added
+
+- Today marks each agent with a small bell: plain when it will notify, struck
+  through when it is muted or unfollowed. The marks appear once a relay
+  carries any routing, or while push is on.
+
 ## [0.20.14] - 2026-09-04
 
 ### Fixed

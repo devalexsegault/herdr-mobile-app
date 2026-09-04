@@ -298,6 +298,8 @@ default; the switch at the top of an agent's sheet mutes it, which is what a
 long approval loop on a big feature usually wants. Settings → Notifications
 also offers **Only followed** per relay: nothing notifies unless you follow an
 agent from its sheet, and the section lists what is followed or muted with a
-way to clear it. The relay stores this with the push subscription, so it
+way to clear it. On Today each agent carries a small bell — plain when it
+notifies, struck through when it does not — so the routing is visible without
+opening anything. The relay stores this with the push subscription, so it
 survives reconnects and applies to blocked-agent and finished notifications
 alike.

@@ -1428,3 +1428,8 @@ textarea { min-height: 6.5rem; resize: vertical; }
 .push-routing-state.muted { background: var(--secondary); color: var(--muted); }
 .push-routing-agent { flex: 1; font-size: .85rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .link-button { appearance: none; background: transparent; border: 0; color: var(--primary); cursor: pointer; font: inherit; font-size: .82rem; font-weight: 550; padding: .4rem .2rem; }
+
+/* Push routing at a glance on an agent row: present but quiet. */
+.push-mark { color: var(--muted); display: inline-flex; flex: 0 0 auto; height: .95rem; opacity: .55; width: .95rem; }
+.push-mark svg { height: 100%; width: 100%; }
+.push-mark.muted { opacity: .8; }

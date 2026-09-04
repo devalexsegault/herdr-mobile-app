@@ -6069,4 +6069,12 @@ test('mutes one agent and follows another for push', async ({ page }) => {
   await expect.poll(async () => (await commands(page)).filter((command) => command.type === 'push_agent_prefs').at(-1))
     .toMatchObject({ pane_id: 'w1:p2', push_agent_state: 'follow' });
   await expect(followSwitch).toHaveAttribute('aria-checked', 'true');
+
+  // Today marks each agent: a muted bell on the ones that stay silent.
+  await second.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('button', { name: 'Back' }).click();
+  const loopRow = page.locator('.agent-row', { hasText: 'Approval loop' });
+  const fixRow = page.locator('.agent-row', { hasText: 'Small fix' });
+  await expect(loopRow.getByRole('img', { name: 'Notifications off for this agent' })).toBeVisible();
+  await expect(fixRow.getByRole('img', { name: 'Notifications on for this agent' })).toBeVisible();
 });
