@@ -3,6 +3,15 @@
 Notable user-facing changes to Herdr Mobile Relay are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
+## [0.20.16] - 2026-09-04
+
+### Changed
+
+- A template column's system prompt opens on a screen of its own: the column
+  shows its first line and length, and tapping it gives the prompt the whole
+  display, with a line and character count and a wrap toggle. A four-thousand
+  character prompt was unreadable in a five-row box inside a sheet.
+
 ## [0.20.15] - 2026-09-04
 
 ### Added

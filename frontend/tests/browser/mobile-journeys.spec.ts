@@ -6078,3 +6078,46 @@ test('mutes one agent and follows another for push', async ({ page }) => {
   await expect(loopRow.getByRole('img', { name: 'Notifications off for this agent' })).toBeVisible();
   await expect(fixRow.getByRole('img', { name: 'Notifications on for this agent' })).toBeVisible();
 });
+
+test('edits a long system prompt on a screen of its own', async ({ page }) => {
+  const longPrompt = ['You are the EXECUTE stage.', '', ...Array.from({ length: 40 }, (_, index) => `Rule ${index + 1}: keep the working tree clean.`)].join('\n');
+  await bootTemplates(page);
+  await setTemplateFixture(page, {
+    list: { templates: [{ ...reviewPipeline, columns: [{ ...reviewPipeline.columns[1], system_prompt: longPrompt }] }], dir: '/home/test/board-templates' },
+    save: { template: reviewPipeline },
+  });
+
+  await page.locator('.tab-bar').getByRole('button', { name: 'Board' }).click();
+  await page.getByRole('tab', { name: 'Templates' }).click();
+  await page.getByRole('article', { name: 'Review pipeline' }).getByRole('button', { name: 'Edit' }).click();
+
+  // The column shows the prompt's first line and its size, not a cramped box.
+  const editor = page.getByRole('dialog', { name: /Review pipeline|New template/ });
+  await editor.getByRole('button', { name: /Expand column 1/ }).click();
+  const opener = editor.getByRole('button', { name: /Edit the system prompt/ });
+  await expect(opener).toContainText('You are the EXECUTE stage.');
+  await expect(opener).toContainText(`${longPrompt.length} chars`);
+
+  // It opens full screen, with the whole prompt in one field.
+  await opener.click();
+  const full = page.getByRole('dialog', { name: 'Execute' });
+  await expect(full).toBeVisible();
+  const field = full.getByRole('textbox', { name: 'Execute' });
+  await expect(field).toHaveValue(longPrompt);
+  await expect(full).toContainText('42 lines');
+  const box = await field.boundingBox();
+  const viewport = page.viewportSize();
+  // The field takes most of the screen; that is the whole point.
+  expect(box!.height).toBeGreaterThan((viewport?.height || 0) * 0.6);
+
+  await field.fill(`${longPrompt}\nRule 41: report what changed.`);
+  await full.getByRole('button', { name: 'Done' }).click();
+  await expect(full).toBeHidden();
+  await expect(opener).toContainText('You are the EXECUTE stage.');
+  await editor.getByRole('button', { name: 'Save template' }).click();
+  await expect.poll(async () => {
+    const sent = (await commands(page)).find((command) => command.type === 'board_template_save') as
+      { template?: { columns?: { system_prompt?: string }[] } } | undefined;
+    return sent?.template?.columns?.[0]?.system_prompt?.endsWith('Rule 41: report what changed.');
+  }).toBe(true);
+});

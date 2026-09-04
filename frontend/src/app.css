@@ -1433,3 +1433,19 @@ textarea { min-height: 6.5rem; resize: vertical; }
 .push-mark { color: var(--muted); display: inline-flex; flex: 0 0 auto; height: .95rem; opacity: .55; width: .95rem; }
 .push-mark svg { height: 100%; width: 100%; }
 .push-mark.muted { opacity: .8; }
+
+/* A long prompt gets the whole screen: bar, field, footer, safe areas. */
+.prompt-editor { background: var(--background); border: 0; color: var(--foreground); display: flex; flex-direction: column; height: 100dvh; inset: 0; margin: 0; max-height: 100dvh; max-width: 100%; padding: 0; width: 100%; }
+.prompt-editor::backdrop { background: var(--background, #0a0a0a); }
+.prompt-editor-bar { align-items: center; border-bottom: 1px solid var(--border); display: flex; gap: .5rem; justify-content: space-between; padding: calc(env(safe-area-inset-top) + .45rem) .6rem .45rem; }
+.prompt-editor-title { flex: 1; font-size: .95rem; font-weight: 650; min-width: 0; overflow: hidden; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.prompt-editor-field { background: var(--background); border: 0; color: var(--foreground); flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .88rem; line-height: 1.55; min-height: 0; padding: .9rem 1rem; resize: none; width: 100%; }
+.prompt-editor-field:focus { outline: none; }
+.prompt-editor-field.nowrap { overflow-x: auto; white-space: pre; }
+.prompt-editor-foot { align-items: center; border-top: 1px solid var(--border); color: var(--muted); display: flex; font-size: .72rem; justify-content: space-between; padding: .5rem 1rem calc(env(safe-area-inset-bottom) + .5rem); }
+/* The row that opens it: first line, size, chevron. */
+.prompt-open { align-items: center; appearance: none; background: var(--input); border: 1px solid var(--border); border-radius: .8rem; color: inherit; cursor: pointer; display: flex; font: inherit; gap: .6rem; justify-content: space-between; min-height: 3rem; padding: .55rem .8rem; text-align: left; width: 100%; }
+.prompt-open:active { background: var(--card-hover); }
+.prompt-open-text { flex: 1; font-size: .86rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prompt-open-meta { align-items: center; color: var(--muted); display: flex; flex: 0 0 auto; font-size: .72rem; gap: .3rem; }
+.prompt-open-meta svg { height: .9rem; width: .9rem; }

@@ -57,7 +57,10 @@ import { constants, gzipSync } from 'node:zlib';
 // Raised from 152 KiB for per-agent push routing (0.20.13): the agent sheet's
 // notify switch, the per-relay routing section in Settings and the store that
 // mirrors the relay's answer add 996 B gzip with no headroom left.
-const limitKiB = 154;
+// Raised from 154 KiB for the full-screen prompt editor (0.20.16): a column's
+// system prompt runs to thousands of characters and needs its own screen,
+// which adds 689 B gzip over a ceiling that had none left.
+const limitKiB = 156;
 const limit = limitKiB * 1024;
 const root = resolve(process.argv[2] || 'dist');
 const files = ['index.html', 'assets/app.js', 'assets/app.css'];
