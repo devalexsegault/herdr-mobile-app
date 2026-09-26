@@ -573,3 +573,14 @@ func stringReplace(value, old, replacement string) string {
 	}
 	return value
 }
+
+func TestCodexQuestionWithOneChoiceAndOther(t *testing.T) {
+	text := "Question 1/1 (1 unanswered)\nContinue with this repository?\n› 1. This repository\n  2. None of the above\ntab to add notes | enter to submit answer | esc to interrupt"
+	interaction := Parse(text, "codex")
+	if interaction == nil || len(interaction.Options) != 1 || interaction.Other.Label != "None of the above" {
+		t.Fatalf("question not recognized: %+v", interaction)
+	}
+	if classification := Classify(text, "codex"); classification.Kind != AttentionQuestion {
+		t.Fatalf("question should be answerable, got %+v", classification)
+	}
+}

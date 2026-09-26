@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ConversationPlan from '$components/ConversationPlan.svelte';
+  import { toolPlan } from '$lib/conversation';
   import ToolPayload from '$components/ToolPayload.svelte';
   import { safeMarkdownHtml } from '$lib/markdown';
   import type { ConversationTool } from '$lib/types';
@@ -23,6 +25,8 @@
 {#if tools.length}
   <div class="conversation-tools" aria-label="Tool activity">
     {#each tools as tool, index (`${tool.id || tool.name}:${index}`)}
+      {@const plan = toolPlan(tool)}
+      {#if plan}<ConversationPlan {plan} />{/if}
       <details class:error={tool.error}>
         <summary>
           <span aria-hidden="true">{tool.error ? '!' : '›'}</span>

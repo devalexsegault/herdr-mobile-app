@@ -6121,3 +6121,76 @@ test('edits a long system prompt on a screen of its own', async ({ page }) => {
     return sent?.template?.columns?.[0]?.system_prompt?.endsWith('Rule 41: report what changed.');
   }).toBe(true);
 });
+
+
+test('uses Codex model, effort and mode cards inside the chat', async ({ page }) => {
+  await boot(page, [fedora]);
+  await expect.poll(() => socketCount(page)).toBe(1);
+  await handshake(page, 0, { capabilities: ['attention_classification', 'structured_questions', 'conversation_history'] });
+  await setConversationFixture(page, {
+    entries: [{ id: 'a1', timestamp: '2026-09-03T08:00:01Z', role: 'assistant', text: 'Ready', model: 'codex-test', effort: 'medium', mode: 'default', tools: [{
+      name: 'update_plan', input: JSON.stringify({ plan: [{ step: 'Check the chat', status: 'in_progress' }] }),
+    }] }], total: 1,
+  });
+  await server(page, 0, { type: 'agents', agents: [{
+    pane_id: 'w1:p1', status: 'idle', project: 'Codex chat', agent: 'codex', session: 'abc', conversation_history_available: true,
+  }] });
+  await page.getByRole('button', { name: 'Open Codex chat on Fedora' }).click();
+  await expect(page.getByRole('region', { name: 'Plan', exact: true })).toContainText('Check the chat');
+  await page.getByRole('button', { name: 'Model: codex-test. Change model' }).click();
+  await expect.poll(async () => (await commands(page)).some((command) => command.type === 'submit_prompt' && command.text === '/model')).toBe(true);
+  const frame = async (content: string) => server(page, 0, { type: 'pane_content', pane_id: 'w1:p1', format: 'plain', content });
+  await frame('Select Model\n› 1. codex-test (current)  Balanced\n  2. another-model  Most capable\nPress enter to select or esc to go back');
+  const dialog = page.getByRole('dialog', { name: 'Agent settings' });
+  const sentKeys = async (keys: string[]) => (await commands(page)).some((command) => command.type === 'send_keys' && JSON.stringify(command.keys) === JSON.stringify(keys));
+  await dialog.getByRole('button', { name: 'another-model Most capable' }).click();
+  await expect.poll(() => sentKeys(['Down', 'Enter'])).toBe(true);
+  await frame('Select Reasoning Level for another-model\n› 1. Medium (current)  Balanced\n  2. High  Thorough\nEnter to select · Esc to cancel');
+  await dialog.getByRole('button', { name: 'High Thorough' }).click();
+  await expect.poll(async () => (await commands(page)).filter((command) => command.type === 'send_keys' && JSON.stringify(command.keys) === JSON.stringify(['Down', 'Enter'])).length).toBe(2);
+  await frame('Ready for your next prompt');
+  await expect(dialog.getByRole('status')).toContainText('Settings updated.');
+  await expect(page.getByRole('button', { name: 'Effort: High. Change effort' })).toBeAttached();
+  await dialog.getByRole('button', { name: /^Plan Discuss/ }).click();
+  await expect.poll(async () => (await commands(page)).some((command) => command.type === 'submit_prompt' && command.text === '/plan')).toBe(true);
+  await frame('›\nPlan mode · shift+tab to switch');
+  await expect(dialog.getByRole('status')).toContainText('Mode set to Plan.');
+  await dialog.getByRole('button', { name: /^Default Work/ }).click();
+  await expect.poll(() => sentKeys(['shift+tab'])).toBe(true);
+  await frame('›\nDefault mode · ? for shortcuts');
+  await expect(dialog.getByRole('status')).toContainText('Mode set to Default.');
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Prompt', exact: true })).toBeEnabled();
+});
+
+test('Alt arms without opening the terminal keyboard', async ({ page }) => {
+  await boot(page, [fedora]);
+  await expect.poll(() => socketCount(page)).toBe(1);
+  await handshake(page, 0);
+  await server(page, 0, { type: 'agents', agents: [{ pane_id: 'w1:p1', status: 'idle', project: 'Alt test', agent: 'codex' }] });
+  await page.getByRole('button', { name: 'Open Alt test on Fedora' }).click();
+  await page.getByRole('button', { name: 'Alt', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Alt', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('textbox', { name: 'Modifier shortcut character' })).not.toBeFocused();
+  expect(await page.evaluate(() => document.activeElement?.matches('input, textarea'))).toBe(false);
+  await page.getByRole('button', { name: 'Tab', exact: true }).click();
+  await expect.poll(async () => (await commands(page)).some((command) => command.type === 'send_keys' && JSON.stringify(command.keys) === JSON.stringify(['alt+tab']))).toBe(true);
+  await page.getByRole('combobox', { name: 'Prompt' }).focus();
+  await expect(page.getByRole('button', { name: 'Alt', exact: true })).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('answers an unclassified Codex question and unlocks chat on the live prompt', async ({ page }) => {
+  await boot(page, [fedora]);
+  await expect.poll(() => socketCount(page)).toBe(1);
+  await handshake(page, 0, { capabilities: ['attention_classification', 'structured_questions', 'conversation_history'] });
+  await setConversationFixture(page, { entries: [], total: 0 });
+  await server(page, 0, { type: 'agents', agents: [{ pane_id: 'w1:p1', status: 'blocked', attention_kind: 'unknown', project: 'Question chat', agent: 'codex', session: 'abc', conversation_history_available: true }] });
+  await page.getByRole('button', { name: 'Open Question chat on Fedora' }).click();
+  await server(page, 0, { type: 'pane_content', pane_id: 'w1:p1', format: 'plain', content:
+    'Question 1/1\nWhich scope?\n› 1. This repository\n  2. None of the above\ntab to add notes | enter to submit answer | esc to interrupt', attention_kind: 'unknown', interaction: null });
+  await page.getByRole('button', { name: 'This repository', exact: true }).click();
+  await expect.poll(async () => (await commands(page)).some((command) => command.type === 'send_keys' && JSON.stringify(command.keys) === JSON.stringify(['Enter']))).toBe(true);
+  await server(page, 0, { type: 'pane_content', pane_id: 'w1:p1', format: 'plain', content: 'Done\n›\n? for shortcuts', attention_kind: 'chat', interaction: null });
+  await expect(page.getByRole('textbox', { name: 'Prompt', exact: true })).toBeEnabled();
+  await expect(page.getByRole('region', { name: 'Codex menu' })).toHaveCount(0);
+});

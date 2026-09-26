@@ -60,7 +60,10 @@ import { constants, gzipSync } from 'node:zlib';
 // Raised from 154 KiB for the full-screen prompt editor (0.20.16): a column's
 // system prompt runs to thousands of characters and needs its own screen,
 // which adds 689 B gzip over a ceiling that had none left.
-const limitKiB = 156;
+// Raised from 156 KiB for Codex model/effort/mode cards and question recovery.
+// The live menu parser, selector state and editable question fallback add
+// approximately 2.8 KiB gzip to the previous build's 159,495 B total.
+const limitKiB = 159;
 const limit = limitKiB * 1024;
 const root = resolve(process.argv[2] || 'dist');
 const files = ['index.html', 'assets/app.js', 'assets/app.css'];

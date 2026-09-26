@@ -1128,7 +1128,18 @@ class RelayStore {
     const index = this.agentsValue.findIndex((agent) => agent.pane_id === paneId);
     if (index < 0) return;
     const agent = this.agentsValue[index];
-    if (!agent.attention_capable || message.attention_kind !== 'question' || !message.interaction) return;
+    if (!agent.attention_capable) return;
+    // An explicit live chat prompt supersedes a question from the slower agent
+    // inventory. Missing/unknown classifications must not dismiss a question.
+    if (message.attention_kind === 'chat' && message.interaction === null) {
+      this.agentsValue[index] = {
+        ...agent, attention_kind: 'chat', interaction: null, options: undefined, question_layout: false,
+      };
+      this.blockedSnapshotMisses.delete(paneId);
+      this.agents.set(this.agentsValue);
+      return;
+    }
+    if (message.attention_kind !== 'question' || !message.interaction) return;
     this.agentsValue[index] = {
       ...agent,
       status: 'blocked',

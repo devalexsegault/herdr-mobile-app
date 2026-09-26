@@ -303,3 +303,28 @@ notifies, struck through when it does not — so the routing is visible without
 opening anything. The relay stores this with the push subscription, so it
 survives reconnects and applies to blocked-agent and finished notifications
 alike.
+
+### Codex in the conversation view
+
+Codex conversations include recorded messages and tool activity in **Full
+history**, plus the latest structured plan in **Conversation**. Plan steps show
+whether they are pending, in progress, or completed. The model chip reports the
+model recorded for the latest assistant turn.
+
+**Agent settings** opens Codex's model/reasoning and permission pickers, and can
+enter plan mode while the agent is idle. Detected menus appear in the chat with
+navigation, selection, and back controls. Verified questions and approvals use
+the existing answer forms. Unrecognized interactions and secret-input prompts
+still require **Terminal**.
+
+Codex model and reasoning menus use the same selection cards as the chat's other
+settings. The **Model**, **Effort**, and **Mode** chips expose recorded settings;
+model choices and reasoning levels come from the running Codex menu. **Default**
+and **Plan** remain distinct from approval permissions.
+
+If question classification is delayed, live numbered Codex choices remain
+answerable in the chat. Native free-text question editors accept an answer in
+the composer, and a live chat prompt clears the previous question lock. Unknown
+prompts provide refresh and cancel controls. In the terminal, **Alt** arms the
+modifier without focusing the keyboard; **Alt + Tab** and **Alt + arrow** remain
+available from the key bar.

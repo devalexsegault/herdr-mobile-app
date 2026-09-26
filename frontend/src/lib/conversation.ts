@@ -1,4 +1,4 @@
-import type { ConversationEntry } from '$lib/types';
+import type { ConversationEntry, ConversationTool } from '$lib/types';
 
 /** Preview budget for a single tool payload, in rendered lines. */
 export const maxPayloadLines = 24;
@@ -94,4 +94,26 @@ export function clampPayload(
     used += Math.min(line.length, maxChars) + 1;
   }
   return { preview: head.join('\n'), clamped: true };
+}
+
+export interface ConversationPlan {
+  explanation: string;
+  steps: { step: string; status: 'pending' | 'in_progress' | 'completed' }[];
+}
+
+export function toolPlan(tool: ConversationTool): ConversationPlan | null {
+  if (!/(^|[.])update_plan$/.test(tool.name) || !tool.input || tool.error) return null;
+  try {
+    const value: unknown = JSON.parse(tool.input);
+    if (!value || typeof value !== 'object' || !('plan' in value) || !Array.isArray(value.plan) || !value.plan.length) return null;
+    const steps: ConversationPlan['steps'] = [];
+    for (const item of value.plan) {
+      if (!item || typeof item.step !== 'string' || !item.step.trim()
+        || !['pending', 'in_progress', 'completed'].includes(item.status)) return null;
+      steps.push({ step: item.step, status: item.status });
+    }
+    return { explanation: 'explanation' in value && typeof value.explanation === 'string' ? value.explanation : '', steps };
+  } catch {
+    return null;
+  }
 }

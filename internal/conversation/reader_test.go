@@ -451,3 +451,27 @@ func TestParseTranscriptRecordsClaudeModel(t *testing.T) {
 		t.Fatalf("user entries = %+v, want no model", entries)
 	}
 }
+
+func TestCodexModelFollowsTurnContext(t *testing.T) {
+	entries := parseTranscript("codex", `{"type":"turn_context","payload":{"model":"codex-one","effort":"high","collaboration_mode":{"mode":"plan"}}}
+{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"hello"}]}}
+{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"first"}]}}
+{"type":"turn_context","payload":{"model":"codex-two"}}
+{"type":"response_item","payload":{"type":"function_call","name":"exec_command","call_id":"call-1","arguments":"{}"}}
+{"type":"response_item","payload":{"type":"function_call_output","call_id":"call-1","output":"done"}}
+{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"second"}]}}`)
+	if len(entries) != 4 {
+		t.Fatalf("expected four entries, got %+v", entries)
+	}
+	for i, want := range []string{"", "codex-one", "codex-two", "codex-two"} {
+		if entries[i].Model != want {
+			t.Errorf("entry %d model = %q, want %q", i, entries[i].Model, want)
+		}
+	}
+	if entries[1].Effort != "high" || entries[1].Mode != "plan" || entries[3].Effort != "" || entries[3].Mode != "" {
+		t.Fatalf("incorrect Codex settings: %+v", entries)
+	}
+	if entries[2].Tools[0].Output != "done" {
+		t.Fatalf("lost tool output: %+v", entries[2])
+	}
+}

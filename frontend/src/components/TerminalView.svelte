@@ -1083,6 +1083,7 @@
     const target = event.target;
     if (!(target instanceof HTMLTextAreaElement)
       && !(target instanceof HTMLInputElement && target.classList.contains('question-other-input'))) return;
+    disarmModifiers();
     composerFocused = true;
   }
 
@@ -1363,11 +1364,12 @@
     if (which === 'ctrl') ctrlArmed = !ctrlArmed;
     else if (which === 'alt') altArmed = !altArmed;
     else shiftArmed = !shiftArmed;
+    if (which === 'alt' && (ctrlArmed || altArmed || shiftArmed)) return;
     if (ctrlArmed || altArmed || shiftArmed) {
       modifierInputElement.value = '';
       modifierInputElement.focus();
     } else {
-      modifierInputElement.blur();
+      modifierInputElement?.blur();
     }
   }
 
@@ -1399,7 +1401,7 @@
     ctrlArmed = false;
     altArmed = false;
     shiftArmed = false;
-    modifierInputElement.blur();
+    modifierInputElement?.blur();
   }
 
   function modifierInput(event: Event) {

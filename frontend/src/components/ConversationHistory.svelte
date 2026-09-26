@@ -15,7 +15,13 @@
     displayName,
     questionInteraction,
   } from '$lib/agents';
-  import { conversationEntries } from '$lib/conversation';
+  import ConversationPlan from '$components/ConversationPlan.svelte';
+  import CodexSettings from '$components/CodexSettings.svelte';
+  import { codexChoices } from '$lib/codex';
+  import CodexMenu from '$components/CodexMenu.svelte';
+  import { stripAnsi } from '$lib/terminal';
+  import { detectTerminalMenu, terminalTextInputActive } from '$lib/terminal-menu';
+  import { conversationEntries, toolPlan } from '$lib/conversation';
   import { clearPromptDraft, loadPromptDraft, savePromptDraft } from '$lib/prompt-drafts';
   import { relayStore } from '$lib/store';
   import type { Agent, ConversationEntry, SlashCommand, SlashCommandCatalog } from '$lib/types';
@@ -62,7 +68,15 @@
   let mounted = false;
 
   const modeEntries = $derived(mode === 'conversation' ? conversationEntries(entries) : entries);
-  const inputLocked = $derived(agentNeedsResponse(agent) || agentNeedsInspection(agent));
+  const latestPlan = $derived.by(() => {
+    for (let index = entries.length - 1; index >= 0; index -= 1) {
+      for (const tool of [...(entries[index].tools || [])].reverse()) {
+        const plan = toolPlan(tool);
+        if (plan) return plan;
+      }
+    }
+    return null;
+  });
   // A running turn can be interrupted from the chat itself; Escape is what
   // every supported agent CLI binds to "stop the current turn".
   const working = $derived(agentStatusGroup(agent) === 'working');
@@ -92,6 +106,7 @@
 
   // Mode and model live in the pane's status line and in the transcript; the
   // chips above the composer surface them and open a picker to change them.
+  const codexLike = $derived(/^(codex|openaicodex)$/i.test(String(agent.agent || '')));
   const claudeLike = $derived(/^(claude|claudecode|qoder|qodercli)$/i.test(String(agent.agent || '')));
   const MODES = [
     { id: 'manual', label: 'Manual', pattern: /manual mode on|default mode on/i, hint: 'Asks before every tool.' },
@@ -109,13 +124,24 @@
     { id: 'haiku', label: 'Haiku', hint: 'Fastest, for mechanical work.' },
     { id: 'default', label: 'Default', hint: 'The account default.' },
   ] as const;
-  const paneText = $derived(($frames.get(agent.pane_id)?.content || '').replace(/\u001b\[[0-9;?]*[A-Za-z]/g, ''));
+  const paneText = $derived(stripAnsi($frames.get(agent.pane_id)?.content || ''));
+  const liveCodexChoices = $derived(codexLike ? codexChoices(paneText) : null);
+  const terminalTextMode = $derived(codexLike && !answerable && (terminalTextInputActive(paneText) || /tab or esc to clear notes/i.test(paneText.split('\n').slice(-6).join(' '))));
+  const codexMenu = $derived(codexLike && !answerable && !$frames.get(agent.pane_id)?.noEcho
+    ? detectTerminalMenu(paneText) || (liveCodexChoices ? { title: liveCodexChoices.title, signature: liveCodexChoices.signature, actions: [{ label: 'Cancel', keys: ['Escape'], cancel: true }] } : null)
+    : null);
+  const inputLocked = $derived((!terminalTextMode && (agentNeedsResponse(agent) || agentNeedsInspection(agent) || Boolean(codexMenu))) || Boolean($frames.get(agent.pane_id)?.noEcho));
+  let confirmedSettings = $state<{ model?: string; effort?: string; mode?: string }>({});
+  const codexContext = $derived(entries.findLast((entry) => entry.role === 'assistant' && entry.model));
+  const currentEffort = $derived(confirmedSettings.effort || codexContext?.effort || '');
   const currentMode = $derived.by(() => {
     const tail = paneText.slice(-2_000);
+    if (codexLike) return /(default|plan) mode/i.exec(tail.slice(-500))?.[1].toLowerCase() || confirmedSettings.mode || codexContext?.mode || '';
     for (const mode of MODES) if (mode.pattern.test(tail)) return mode.id;
     return '';
   });
   const currentModel = $derived.by(() => {
+    if (codexLike && confirmedSettings.model) return confirmedSettings.model;
     for (let index = entries.length - 1; index >= 0; index -= 1) {
       const model = entries[index].model;
       if (entries[index].role === 'assistant' && model) return model;
@@ -132,7 +158,9 @@
   let settingsStatus = $state('');
   let settingsError = $state(false);
 
-  function openSettings() {
+  let settingsSection = $state<'model' | 'effort' | 'mode'>('mode');
+  function openSettings(section: 'model' | 'effort' | 'mode' = 'mode') {
+    settingsSection = section;
     settingsOpen = true;
     settingsStatus = '';
     settingsError = false;
@@ -152,7 +180,7 @@
   // Claude Code cycles its permission mode on shift+tab; press until the
   // status line names the requested one, and give up after a full turn.
   async function selectMode(target: (typeof MODES)[number]['id']) {
-    if (settingsBusy) return;
+    if (settingsBusy || inputLocked || working) return;
     settingsBusy = true;
     settingsError = false;
     settingsStatus = 'Switching mode…';
@@ -179,7 +207,7 @@
   }
 
   async function selectModel(target: string) {
-    if (settingsBusy) return;
+    if (settingsBusy || inputLocked || working) return;
     settingsBusy = true;
     settingsError = false;
     settingsStatus = 'Switching model…';
@@ -203,7 +231,7 @@
     if (ok) answered = { eventId, choice: option, at: Date.now() };
   }
 
-  const inputPlaceholder = $derived(answerable
+  const inputPlaceholder = $derived(terminalTextMode ? 'Type your answer…' : answerable
     ? 'Answer above to continue'
     : agentNeedsResponse(agent)
       ? 'Needs response — switch to Terminal'
@@ -224,7 +252,7 @@
     mounted = true;
     void loadLatest();
     relayStore.readPane(agent, true);
-    const refresh = setInterval(() => { void loadLatest(); }, 5_000);
+    const refresh = setInterval(() => { void loadLatest(); relayStore.readPane(agent, true); }, 5_000);
     return () => {
       mounted = false;
       clearInterval(refresh);
@@ -424,6 +452,15 @@
     composerElement?.setSelectionRange(composer.length, composer.length);
   }
 
+  async function cancelQuestion() {
+    try {
+      await relayStore.sendToAgent(agent, { type: 'send_keys', keys: ['Escape'], activity_label: 'Cancel question' });
+      relayStore.readPane(agent, true);
+    } catch (failure) {
+      relayStore.showToast(failure instanceof Error ? failure.message : 'Could not cancel the question.', true);
+    }
+  }
+
   async function stopAgent() {
     if (stopping) return;
     stopping = true;
@@ -447,10 +484,18 @@
     const text = submittedDraft.replace(/[\r\n]+$/g, '');
     if (!text || inputLocked || sendingPrompt || uploadingImage) return;
     sendingPrompt = true;
+    let terminalTextInserted = false;
     composer = '';
     clearPromptDraft(agent);
     try {
-      await relayStore.sendToAgent(agent, { type: 'submit_prompt', text });
+      if (terminalTextMode) {
+        await relayStore.sendToAgent(agent, { type: 'send_text', text });
+        terminalTextInserted = true;
+        await relayStore.sendToAgent(agent, { type: 'send_keys', keys: ['Enter'], activity_label: 'Submitted question answer' });
+      } else {
+        await relayStore.sendToAgent(agent, { type: 'submit_prompt', text });
+      }
+      relayStore.readPane(agent, true);
       relayStore.showToast('Prompt sent.');
       clearUploadStatus();
       setTimeout(() => { void loadLatest(); }, 500);
@@ -462,11 +507,11 @@
         && failure.data !== null
         && 'dispatched_unknown' in failure.data
         && failure.data.dispatched_unknown === true;
-      if (!composer && !dispatchedUnknown) composer = submittedDraft;
+      if (!composer && !dispatchedUnknown && !terminalTextInserted) composer = submittedDraft;
       else clearUploadStatus();
       const detail = failure instanceof Error ? failure.message : 'Prompt could not be sent.';
       relayStore.showToast(
-        dispatchedUnknown ? `${detail} Check the terminal before sending again.` : detail,
+        terminalTextInserted ? `${detail} Your text was inserted; use Enter to submit it.` : dispatchedUnknown ? `${detail} Check the terminal before sending again.` : detail,
         true,
       );
     } finally {
@@ -590,11 +635,15 @@
             {#if entry.truncated}<small>Long turn truncated by the relay.</small>{/if}
           </article>
         {/each}
+        {#if mode === 'conversation' && latestPlan && !query.trim()}<ConversationPlan plan={latestPlan} />{/if}
       </div>
     </section>
   {/if}
 
   <div class="conversation-input-area">
+    {#if codexMenu}
+      <CodexMenu {agent} menu={codexMenu} text={paneText} />
+    {/if}
     {#if answerable}
       <div class="conversation-answer" aria-label={`Pending request from ${displayName(agent)}`}>
         {#if interaction}
@@ -629,14 +678,19 @@
       </div>
     {/if}
     <div class="conversation-chips" aria-label="Agent settings">
-      <button type="button" class="chip-button" onclick={openSettings} aria-label="Mode: {currentMode ? MODES.find((mode) => mode.id === currentMode)?.label : 'unknown'}. Change mode">
+      <button type="button" class="chip-button" onclick={() => openSettings('mode')} aria-label="Mode: {currentMode ? (currentMode === 'default' ? 'Default' : MODES.find((mode) => mode.id === currentMode)?.label) : 'unknown'}. Change mode">
         <span class="chip-key">Mode</span>
-        <span class="chip-value">{currentMode ? MODES.find((mode) => mode.id === currentMode)?.label : '…'}</span>
+        <span class="chip-value">{currentMode ? (currentMode === 'default' ? 'Default' : MODES.find((mode) => mode.id === currentMode)?.label) : '…'}</span>
       </button>
-      {#if claudeLike}
-        <button type="button" class="chip-button" onclick={openSettings} aria-label="Model: {currentModel ? modelAlias(currentModel) : 'unknown'}. Change model">
+      {#if claudeLike || codexLike}
+        <button type="button" class="chip-button" onclick={() => openSettings('model')} aria-label="Model: {currentModel ? modelAlias(currentModel) : 'unknown'}. Change model">
           <span class="chip-key">Model</span>
           <span class="chip-value">{currentModel ? modelAlias(currentModel) : '…'}</span>
+        </button>
+      {/if}
+      {#if codexLike}
+        <button type="button" class="chip-button" onclick={() => openSettings('effort')} aria-label="Effort: {currentEffort || 'unknown'}. Change effort">
+          <span class="chip-key">Effort</span><span class="chip-value">{currentEffort || '…'}</span>
         </button>
       {/if}
     </div>
@@ -713,8 +767,12 @@
         onchange={(event) => { void filesSelected(event.currentTarget.files || []); event.currentTarget.value = ''; }}
       />
     </form>
-    {#if inputLocked && !answerable}
-      <p class="conversation-composer-status" role="status">Switch to Terminal to handle the pending agent interaction.</p>
+    {#if inputLocked && !answerable && !codexMenu}
+      <p class="conversation-composer-status" role="status">{codexLike ? 'Waiting for the question controls. Refresh to load the current choices.' : 'Switch to Terminal to handle the pending agent interaction.'}</p>
+      {#if codexLike}
+        <Button variant="secondary" size="sm" onclick={() => { relayStore.readPane(agent, true); }}>Refresh question</Button>
+        <Button variant="ghost" size="sm" onclick={() => { void cancelQuestion(); }}>Cancel question</Button>
+      {/if}
     {:else if uploadStatus}
       <p class:error={uploadError} class="conversation-composer-status" role="status">{uploadStatus}</p>
     {/if}
@@ -759,6 +817,14 @@
 
 
 <AppDialog id="conversation-settings" bind:open={settingsOpen} title="Agent settings" description="Mode and model of this agent. Changes go to the running agent right away.">
+  {#if codexLike}
+    {#if settingsOpen}
+      <CodexSettings {agent} model={currentModel} effort={currentEffort} mode={currentMode} section={settingsSection}
+        locked={working || answerable || Boolean($frames.get(agent.pane_id)?.noEcho) || liveCodexChoices?.kind === 'question' || ((agentNeedsResponse(agent) || agentNeedsInspection(agent)) && !liveCodexChoices)}
+        onchange={(settings) => { confirmedSettings = { ...confirmedSettings, ...settings }; }} />
+    {/if}
+    <div class="dialog-actions"><Button variant="ghost" onclick={() => { settingsOpen = false; }}>Close</Button></div>
+  {:else}
   <div class="form-stack">
     <h3 class="settings-section-title">Mode</h3>
     {#if claudeLike}
@@ -769,7 +835,7 @@
             class="choice"
             class:active={currentMode === mode.id}
             aria-pressed={currentMode === mode.id}
-            disabled={settingsBusy}
+            disabled={settingsBusy || inputLocked || working}
             onclick={() => { void selectMode(mode.id); }}
           >
             <strong>{mode.label}</strong>
@@ -789,7 +855,7 @@
             class="choice"
             class:active={currentModel !== '' && modelAlias(currentModel) === model.id}
             aria-pressed={currentModel !== '' && modelAlias(currentModel) === model.id}
-            disabled={settingsBusy}
+            disabled={settingsBusy || inputLocked || working}
             onclick={() => { void selectModel(model.id); }}
           >
             <strong>{model.label}</strong>
@@ -809,10 +875,10 @@
           autocapitalize="off"
           spellcheck="false"
         />
-        <Button type="submit" variant="secondary" size="sm" disabled={!modelDraft.trim() || settingsBusy}>Use</Button>
+        <Button type="submit" variant="secondary" size="sm" disabled={!modelDraft.trim() || settingsBusy || inputLocked || working}>Use</Button>
       </form>
     {:else}
-      <Button variant="secondary" disabled={settingsBusy} onclick={() => { void selectModel(''); }}>Open the model picker</Button>
+      <Button variant="secondary" disabled={settingsBusy || inputLocked || working} onclick={() => { void selectModel(''); }}>{codexLike ? 'Choose model and reasoning effort' : 'Open the model picker'}</Button>
     {/if}
     {#if settingsStatus}
       <p class:error={settingsError} class="conversation-composer-status" role="status">{settingsStatus}</p>
@@ -821,4 +887,5 @@
       <Button variant="ghost" onclick={() => { settingsOpen = false; }}>Close</Button>
     </div>
   </div>
+  {/if}
 </AppDialog>

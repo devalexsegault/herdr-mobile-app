@@ -1449,3 +1449,6 @@ textarea { min-height: 6.5rem; resize: vertical; }
 .prompt-open-text { flex: 1; font-size: .86rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prompt-open-meta { align-items: center; color: var(--muted); display: flex; flex: 0 0 auto; font-size: .72rem; gap: .3rem; }
 .prompt-open-meta svg { height: .9rem; width: .9rem; }
+
+/* Keep pending questions scrollable without pushing the composer off a phone. */
+.conversation-answer .question-form { max-height: min(45dvh, 26rem); border-top: 0; padding: 0; }

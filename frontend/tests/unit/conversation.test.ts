@@ -183,3 +183,20 @@ describe('ConversationMessage tool cards', () => {
     expect(screen.getByRole('button', { expanded: true, name: 'Show less' })).toBeInTheDocument();
   });
 });
+
+describe('Codex plans', () => {
+  it('renders steps and their progress', () => {
+    render(ConversationMessage, { text: '', tools: [{ name: 'functions.update_plan', input: JSON.stringify({
+      explanation: 'Ship the chat', plan: [{ step: 'Inspect', status: 'completed' }, { step: 'Build', status: 'in_progress' }],
+    }) }] });
+    expect(screen.getByRole('region', { name: 'Plan' })).toHaveTextContent('Ship the chat');
+    expect(screen.getByText('Build').closest('li')).toHaveAttribute('aria-current', 'step');
+    expect(screen.getByText('Completed')).toBeInTheDocument();
+  });
+
+  it('keeps malformed plan payloads inspectable', () => {
+    const { container } = render(ConversationMessage, { text: '', tools: [{ name: 'update_plan', input: '{"plan":[null]}' }] });
+    expect(screen.queryByRole('region', { name: 'Plan' })).not.toBeInTheDocument();
+    expect(container.textContent).toContain('null');
+  });
+});

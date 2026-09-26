@@ -1049,7 +1049,7 @@ func parseCodex(text string) *Interaction {
 		rows = append(rows, codexRow{line: index, focus: match[1] != "", prefix: prefix, body: match[3]})
 		expected++
 	}
-	if len(rows) < 3 {
+	if len(rows) < 2 {
 		return nil
 	}
 	firstOption := rows[0].line

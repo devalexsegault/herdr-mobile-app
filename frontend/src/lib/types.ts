@@ -260,6 +260,8 @@ export interface ConversationEntry {
   tools?: ConversationTool[];
   /** Model that produced an assistant turn, when the transcript records it. */
   model?: string;
+  effort?: string;
+  mode?: string;
 }
 
 export interface ConversationPage {

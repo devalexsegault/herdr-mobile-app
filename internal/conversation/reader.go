@@ -48,8 +48,10 @@ type Entry struct {
 	Text      string         `json:"text,omitempty"`
 	Tools     []ToolActivity `json:"tools,omitempty"`
 	// Model is the model that produced an assistant turn, when the transcript
-	// records it (Claude Code does); the phone shows the latest one.
+	// records it; the phone shows the latest one.
 	Model     string `json:"model,omitempty"`
+	Effort    string `json:"effort,omitempty"`
+	Mode      string `json:"mode,omitempty"`
 	Truncated bool   `json:"truncated,omitempty"`
 }
 
@@ -489,12 +491,21 @@ func parseTranscript(agent, text string) []Entry {
 	entries := make([]Entry, 0)
 	seenIDs := make(map[string]int)
 	pendingTools := make(map[string]toolLocation)
+	codexModel, codexEffort, codexMode := "", "", ""
 	for _, line := range strings.Split(text, "\n") {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
 		var record map[string]any
 		if json.Unmarshal([]byte(line), &record) != nil {
+			continue
+		}
+		if (normalized == "codex" || normalized == "openaicodex") && stringValue(record["type"]) == "turn_context" {
+			payload, _ := record["payload"].(map[string]any)
+			codexModel = strings.TrimSpace(stringValue(payload["model"]))
+			codexEffort = strings.TrimSpace(stringValue(payload["effort"]))
+			collaboration, _ := payload["collaboration_mode"].(map[string]any)
+			codexMode = stringValue(collaboration["mode"])
 			continue
 		}
 		calls, results := parseToolActivity(normalized, record)
@@ -531,10 +542,18 @@ func parseTranscript(agent, text string) []Entry {
 		body, truncated := clampText(body, maxEntryBytes)
 		id := stableRowID(line, seenIDs)
 		entryIndex := len(entries)
+		model := recordModel(record, role)
+		if role == "assistant" && codexModel != "" {
+			model = codexModel
+		}
 		entries = append(entries, Entry{
 			ID: id, Timestamp: timestamp, Role: role, Text: body, Tools: calls, Truncated: truncated,
-			Model: recordModel(record, role),
+			Model: model,
 		})
+		if role == "assistant" && (normalized == "codex" || normalized == "openaicodex") {
+			entries[entryIndex].Effort = codexEffort
+			entries[entryIndex].Mode = codexMode
+		}
 		for toolIndex := range calls {
 			if calls[toolIndex].ID != "" {
 				pendingTools[calls[toolIndex].ID] = toolLocation{entry: entryIndex, tool: toolIndex}
