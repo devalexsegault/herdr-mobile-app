@@ -120,3 +120,40 @@ func TestHydrateWorkspaceCwdsKeepsShellOnlyWorkspaceLaunchable(t *testing.T) {
 		t.Fatalf("workspace cwd = %q", workspaces[0].Cwd)
 	}
 }
+
+func TestAgentsFromTopologyKeepsShellPanesWithoutLifecycle(t *testing.T) {
+	agentPanes := []herdr.Pane{{ID: "w1:p1", TabID: "w1:t1", WorkspaceID: "w1", Agent: "claude", Status: "working"}}
+	topologyPanes := []herdr.Pane{
+		{ID: "w1:p1", TabID: "w1:t1", WorkspaceID: "w1", Agent: "claude"},
+		{ID: "w1:p2", TabID: "w1:t1", WorkspaceID: "w1", Status: "idle", Cwd: "/src/app"},
+	}
+	poller := NewPoller(nil, testState(), time.Second, testLogger())
+
+	agents := poller.agentsFromTopology("", withShellPanes(agentPanes, topologyPanes), []herdr.Tab{{ID: "w1:t1", WorkspaceID: "w1", Label: "main"}})
+
+	if len(agents) != 2 {
+		t.Fatalf("agents = %d, want the agent and the shell", len(agents))
+	}
+	if agents[0].Status != "working" {
+		t.Fatalf("agent pane lost its agent-list record: %+v", agents[0])
+	}
+	shell := agents[1]
+	if shell.PaneID != "w1:p2" || !shell.Shell || agents[0].Shell || shell.Status != "" || shell.Project != "app" || shell.TabLabel != "main" {
+		t.Fatalf("shell pane = %+v", shell)
+	}
+}
+
+func TestShellPaneAcceptsInputWithoutTransition(t *testing.T) {
+	state := testState()
+	transitions := 0
+	state.SetOnTransition(func(string, string, string, string, int64) { transitions++ })
+	state.CommitInventory([]*AgentState{{PaneID: "w1:p2"}}, 0)
+	state.CommitInventory([]*AgentState{{PaneID: "w1:p2"}}, 0)
+
+	if _, active := state.PaneSession("w1:p2"); !active {
+		t.Fatal("shell pane is not addressable for keys and text")
+	}
+	if transitions != 0 {
+		t.Fatalf("shell pane fired %d transitions", transitions)
+	}
+}

@@ -159,7 +159,11 @@ func (p *Poller) poll(ctx context.Context) {
 		topologyPanes = inv.Panes
 	}
 	hydrateWorkspaceCwds(workspaces, tabs, topologyPanes)
-	agents := p.agentsFromTopology("", inv.Panes, tabs)
+	panes := inv.Panes
+	if paneErr == nil {
+		panes = withShellPanes(inv.Panes, topologyPanes)
+	}
+	agents := p.agentsFromTopology("", panes, tabs)
 
 	if p.enrich != nil {
 		p.enrich(ctx, agents)
@@ -259,7 +263,9 @@ func (p *Poller) agentsFromTopology(session string, panes []herdr.Pane, tabs []h
 	agents := make([]*AgentState, 0, len(panes))
 	for _, pane := range panes {
 		if pane.Agent == "" {
-			continue
+			// A shell pane carries no lifecycle; a stale status from a
+			// released agent must not look like agent activity.
+			pane.Status = ""
 		}
 		if tab, ok := tabByID[pane.TabID]; ok {
 			pane.TabLabel = tab.Label
@@ -279,6 +285,7 @@ func (p *Poller) agentsFromTopology(session string, panes []herdr.Pane, tabs []h
 			TabOrder:        tabOrderByID[pane.TabID],
 			WorkspaceID:     pane.WorkspaceID,
 			Agent:           pane.Agent,
+			Shell:           pane.Agent == "",
 			Name:            pane.Name,
 			Status:          pane.Status,
 			Focused:         pane.Focused,
@@ -294,6 +301,24 @@ func (p *Poller) agentsFromTopology(session string, panes []herdr.Pane, tabs []h
 		})
 	}
 	return agents
+}
+
+// withShellPanes appends the panes no agent occupies, so plain shells can be
+// listed and driven from the terminal view. Agent panes keep the richer
+// agent-list record.
+func withShellPanes(agentPanes, topologyPanes []herdr.Pane) []herdr.Pane {
+	known := make(map[string]bool, len(agentPanes))
+	for _, pane := range agentPanes {
+		known[pane.ID] = true
+	}
+	panes := append([]herdr.Pane(nil), agentPanes...)
+	for _, pane := range topologyPanes {
+		if pane.Agent != "" || known[pane.ID] {
+			continue
+		}
+		panes = append(panes, pane)
+	}
+	return panes
 }
 
 func hydrateWorkspaceCwds(workspaces []herdr.Workspace, tabs []herdr.Tab, panes []herdr.Pane) {

@@ -67,6 +67,7 @@
   const relays = relayStore.relayConfigs;
   const connections = relayStore.connections;
   const agents = relayStore.agents;
+  const shells = relayStore.shells;
   const workspaces = relayStore.workspaces;
   const activities = relayStore.activities;
   const frames = relayStore.terminalFrames;
@@ -96,7 +97,9 @@
   const activeAgent = $derived.by(() => {
     const view = $currentView;
     if (view.view !== 'terminal' && view.view !== 'history') return null;
-    return $agents.find((agent) => agent.pane_id === view.paneId) || null;
+    return $agents.find((agent) => agent.pane_id === view.paneId)
+      || $shells.find((shell) => shell.pane_id === view.paneId)
+      || null;
   });
   const activeConnection = $derived(activeAgent ? $connections.get(activeAgent.relay_id) : null);
   const conversationHistoryAvailable = $derived(Boolean(
@@ -647,6 +650,7 @@
   {:else}
     <HomeView
       agents={$agents}
+      shells={$shells}
       relays={$relays}
       connections={$connections}
       responding={$responding}

@@ -25,12 +25,14 @@ type AgentState struct {
 	TabOrder    int    `json:"tab_order,omitempty"`
 	WorkspaceID string `json:"workspace_id"`
 	Agent       string `json:"agent"`
-	Name        string `json:"name"`
-	Status      string `json:"status"`
-	Focused     bool   `json:"_focused"`
-	Cwd         string `json:"cwd"`
-	Project     string `json:"project"`
-	Host        string `json:"host"`
+	// Shell marks a pane no agent occupies; it opens as a plain terminal.
+	Shell   bool   `json:"shell,omitempty"`
+	Name    string `json:"name"`
+	Status  string `json:"status"`
+	Focused bool   `json:"_focused"`
+	Cwd     string `json:"cwd"`
+	Project string `json:"project"`
+	Host    string `json:"host"`
 	// HerdrSession names the Herdr session the pane lives in; empty for the
 	// base session. Session, below, is the agent's own conversation session.
 	HerdrSession                 string                 `json:"herdr_session,omitempty"`

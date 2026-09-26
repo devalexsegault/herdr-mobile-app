@@ -106,11 +106,13 @@ func (p *Poller) collectSession(ctx context.Context, client *herdr.Client, prefi
 	}
 	hydrateWorkspaceCwds(workspaces, tabs, topologyPanes)
 	herdr.QualifyTopology(prefix, workspaces, tabs, inv.Panes)
+	panes := inv.Panes
 	if paneErr == nil {
 		herdr.QualifyTopology(prefix, nil, nil, topologyPanes)
+		panes = withShellPanes(inv.Panes, topologyPanes)
 	}
 	return sessionTopology{
-		agents:     p.agentsFromTopology(prefix, inv.Panes, tabs),
+		agents:     p.agentsFromTopology(prefix, panes, tabs),
 		workspaces: workspaces,
 	}, nil
 }

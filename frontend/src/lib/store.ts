@@ -15,6 +15,7 @@ import {
   agentStatusGroup,
   approvalOptions,
   clientPaneId,
+  isShellPane,
   mergeAgentDetails,
   mergeAgentList,
   normalizeAgent,
@@ -269,6 +270,8 @@ class RelayStore {
   readonly relayConfigs = writable<RelayConfig[]>([]);
   readonly connections = writable<Map<string, RelayConnection>>(new Map());
   readonly agents = writable<Agent[]>([]);
+  /** Panes no agent occupies; they open as a plain terminal. */
+  readonly shells = writable<Agent[]>([]);
   readonly workspaces = writable<RelayWorkspace[]>([]);
   readonly activities = writable<Activity[]>([]);
   /**
@@ -398,6 +401,11 @@ class RelayStore {
     this.activities.set(this.activitiesValue);
   }
 
+  private publishAgents(): void {
+    this.agents.set(this.agentsValue.filter((agent) => !isShellPane(agent)));
+    this.shells.set(this.agentsValue.filter(isShellPane));
+  }
+
   connectAll(preserveAgents = false): void {
     this.reconnectEnabled = true;
     this.reconnectAttempts.clear();
@@ -406,7 +414,7 @@ class RelayStore {
     this.connections.set(new Map());
     if (!preserveAgents) {
       this.agentsValue = [];
-      this.agents.set([]);
+      this.publishAgents();
       this.workspacesValue = [];
       this.workspaces.set([]);
     }
@@ -839,7 +847,7 @@ class RelayStore {
       this.agentsValue = this.agentsValue.map((agent) =>
         agent.relay_id === relayId ? normalizeAgentAttention(agent, attentionCapable) : agent,
       );
-      this.agents.set(this.agentsValue);
+      this.publishAgents();
       connection.agentProfiles = Array.isArray(message.agent_profiles)
         ? message.agent_profiles
           .filter((profile: unknown): profile is AgentProfile => {
@@ -987,7 +995,7 @@ class RelayStore {
         this.respondingValue,
       );
       this.reconcileResponding();
-      this.agents.set(this.agentsValue);
+      this.publishAgents();
       return;
     }
     if (message.type === 'blocked') {
@@ -1005,7 +1013,7 @@ class RelayStore {
       } else this.agentsValue = [...this.agentsValue, next];
       this.respondingValue.delete(next.pane_id);
       this.responding.set(new Set(this.respondingValue));
-      this.agents.set(this.agentsValue);
+      this.publishAgents();
       return;
     }
     if (message.type === 'agent_update' && message.pane_id) {
@@ -1027,7 +1035,7 @@ class RelayStore {
         this.agentsValue = copy;
       } else this.agentsValue = [...this.agentsValue, stabilized];
       this.reconcileResponding();
-      this.agents.set(this.agentsValue);
+      this.publishAgents();
       return;
     }
     if (message.type === 'pane_unchanged') {
@@ -1136,7 +1144,7 @@ class RelayStore {
         ...agent, attention_kind: 'chat', interaction: null, options: undefined, question_layout: false,
       };
       this.blockedSnapshotMisses.delete(paneId);
-      this.agents.set(this.agentsValue);
+      this.publishAgents();
       return;
     }
     if (message.attention_kind !== 'question' || !message.interaction) return;
@@ -1147,7 +1155,7 @@ class RelayStore {
       interaction: message.interaction as QuestionInteraction,
     };
     this.blockedSnapshotMisses.delete(paneId);
-    this.agents.set(this.agentsValue);
+    this.publishAgents();
   }
 
   private removeAgentsForRelay(relayId: string): void {
@@ -1158,7 +1166,7 @@ class RelayStore {
     for (const paneId of this.pendingPaneReads.keys()) {
       if (paneId.startsWith(`${relayId}::`)) this.pendingPaneReads.delete(paneId);
     }
-    this.agents.set(this.agentsValue);
+    this.publishAgents();
   }
 
   private removeWorkspacesForRelay(relayId: string): void {
@@ -1904,7 +1912,7 @@ class RelayStore {
   async acknowledgePane(agent: Agent): Promise<void> {
     if (agentStatusGroup(agent) === 'done') {
       this.agentsValue = this.agentsValue.map((item) => item.pane_id === agent.pane_id ? { ...item, status: 'idle' } : item);
-      this.agents.set(this.agentsValue);
+      this.publishAgents();
     }
     await this.sendToAgent(agent, { type: 'acknowledge_pane' }).catch((error) => this.showToast(error.message, true));
   }
@@ -1987,7 +1995,7 @@ class RelayStore {
           question_layout: Boolean(interaction),
         }
       : item);
-    this.agents.set(this.agentsValue);
+    this.publishAgents();
   }
 
   requestActivities(): void {

@@ -190,6 +190,8 @@ export interface Agent {
   raw_pane_id: string;
   pane_id: string;
   agent?: string;
+  /** The relay lists this pane with no agent in it: a plain shell. */
+  shell?: boolean;
   name?: string;
   status?: string;
   session?: string;

@@ -202,6 +202,11 @@ export function clientPaneId(relayId: string, rawPaneId: string): string {
   return `${relayId}::${rawPaneId}`;
 }
 
+/** A plain shell pane: the relay lists it with no agent occupying it. */
+export function isShellPane(agent: Pick<Agent, 'agent' | 'shell'>): boolean {
+  return agent.shell === true && !agent.agent;
+}
+
 export function normalizeAgent(
   relayId: string,
   relayLabel: string,

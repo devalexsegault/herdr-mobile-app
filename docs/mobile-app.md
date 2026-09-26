@@ -291,6 +291,15 @@ Claude Code, Codex, Kimi, Oh My Pi, Pi, or Qoder, it runs that agent's own copy
 command; every other case takes the visible terminal output. The agent command
 refuses a busy composer, so it cannot interrupt an in-flight turn.
 
+### Shell panes
+
+Panes that no agent occupies are listed under **Terminals** on the home screen.
+Opening one shows only the terminal: the input field types a command and
+presses Enter in the shell, and the key bar sends Esc, Tab, Ctrl combinations,
+arrows and function keys. Slash-command suggestions, approvals and response
+copying stay reserved for agents. Shell panes never notify and never count as
+agents. Starting an agent in a shell pane moves it back to the agent list.
+
 ## Which agents notify
 
 Push notifications are routed per agent, per relay. Every agent notifies by

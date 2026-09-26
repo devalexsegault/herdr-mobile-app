@@ -15,6 +15,7 @@
     attentionKind,
     approvalButtonTone,
     approvalOptions,
+    isShellPane,
     questionInteraction,
     sortedAgents,
   } from '$lib/agents';
@@ -207,6 +208,8 @@
   const responsePending = $derived(agentNeedsResponse(agent));
   const approvalMode = $derived(responsePending && attentionKind(agent) === 'approval');
   const inspectionMode = $derived(agentNeedsInspection(agent));
+  // A pane no agent occupies: the composer types straight into the shell.
+  const shellMode = $derived(isShellPane(agent));
   const inputLocked = $derived(responsePending || inspectionMode);
   const interaction = $derived(questionInteraction(agent));
   const questionMode = $derived(Boolean(responsePending && attentionKind(agent) === 'question' && interaction));
@@ -229,7 +232,7 @@
   const resizeLayoutPending = $derived(resizeSessionActive && !resizeLayoutActive);
   const options = $derived(approvalOptions(agent));
   const nextBlocked = $derived(sortedAgents(allAgents.filter((item) => agentNeedsResponse(item) && item.pane_id !== agent.pane_id))[0]);
-  const slashQuery = $derived(composer.startsWith('/') && !/\s/.test(composer) ? composer.slice(1).toLocaleLowerCase() : null);
+  const slashQuery = $derived(!shellMode && composer.startsWith('/') && !/\s/.test(composer) ? composer.slice(1).toLocaleLowerCase() : null);
   const filteredSlashCommands = $derived.by(() => {
     if (slashQuery === null) return [];
     if (!slashQuery) return slashCatalog.commands;
@@ -246,7 +249,7 @@
     stripAnsi(displayed)
       .replaceAll(TERMINAL_SEPARATOR_TOKEN, '────────'),
   );
-  const terminalTextMode = $derived(inspectionMode && terminalTextInputActive(terminalPlainText));
+  const terminalTextMode = $derived(shellMode || (inspectionMode && terminalTextInputActive(terminalPlainText)));
   const composerLocked = $derived(responsePending || (inspectionMode && !terminalTextMode));
   // The relay recognizes the prompt; that recognition is what opens the masked
   // input, even while the generic composer stays locked for inspection.
@@ -279,6 +282,7 @@
     ? `${armedModifierLabel} armed${keyFeedback ? ` · ${keyFeedback}` : ' — choose a key or type a character'}`
     : keyFeedback);
   const agentResponseCopySupported = $derived.by(() => {
+    if (shellMode) return false;
     const connection = $connections.get(agent.relay_id);
     return Boolean(
       connection?.capabilities.includes('agent_response_copy')
@@ -564,7 +568,10 @@
   onMount(() => {
     let mounted = true;
     componentMounted = true;
-    void relayStore.loadSlashCommands(agent).then((catalog) => {
+    // A shell has no slash commands; a leading "/" is a path.
+    void (shellMode
+      ? Promise.reject(new Error('Shell panes have no slash commands.'))
+      : relayStore.loadSlashCommands(agent)).then((catalog) => {
       if (!mounted) return;
       slashCatalog = catalog;
       slashCatalogUnavailable = false;
@@ -1113,12 +1120,12 @@
         await relayStore.sendToAgent(agent, {
           type: 'send_keys',
           keys: ['Enter'],
-          activity_label: 'Submitted terminal text',
+          activity_label: shellMode ? 'Ran command' : 'Submitted terminal text',
         });
       } else {
         await relayStore.sendToAgent(agent, { type: 'submit_prompt', text });
       }
-      relayStore.showToast(terminalText ? 'Terminal text submitted.' : 'Prompt sent.');
+      relayStore.showToast(shellMode ? 'Command sent.' : terminalText ? 'Terminal text submitted.' : 'Prompt sent.');
     } catch (error) {
       const dispatchedUnknown = typeof error === 'object'
         && error !== null
@@ -2032,7 +2039,9 @@
           bind:value={composer}
           rows="1"
           disabled={composerLocked}
-          placeholder={approvalMode
+          placeholder={shellMode
+            ? 'Type a command…'
+            : approvalMode
             ? 'Approval pending — use buttons'
             : inspectionMode
               ? terminalTextMode
@@ -2040,16 +2049,16 @@
                 : 'Needs inspection — use terminal controls'
               : 'Type a reply…'}
           role="combobox"
-          aria-label="Prompt"
+          aria-label={shellMode ? 'Command' : 'Prompt'}
           aria-autocomplete="list"
           aria-haspopup="listbox"
           aria-expanded={slashMenuOpen}
           aria-controls={slashMenuOpen ? 'slash-command-options' : undefined}
           aria-activedescendant={slashMenuOpen && effectiveSlashIndex >= 0 ? `slash-command-option-${effectiveSlashIndex}` : undefined}
           autocomplete="off"
-          autocorrect="on"
-          autocapitalize="sentences"
-          spellcheck="true"
+          autocorrect={shellMode ? 'off' : 'on'}
+          autocapitalize={shellMode ? 'none' : 'sentences'}
+          spellcheck={!shellMode}
           enterkeyhint="enter"
           oninput={composerInput}
           onkeydown={keydown}
@@ -2057,7 +2066,7 @@
         ></textarea>
         {#if composer}<button class="input-clear" aria-label="Clear prompt text" onclick={clearComposer}>×</button>{/if}
       </div>
-      <Button size="icon" disabled={!composer.replace(/[\r\n]+$/g, '') || composerLocked || sendingPrompt} aria-label={sendingPrompt ? 'Submitting input' : inspectionMode ? 'Submit terminal text' : 'Send prompt'} onclick={sendPrompt}>{sendingPrompt ? '…' : '➤'}</Button>
+      <Button size="icon" disabled={!composer.replace(/[\r\n]+$/g, '') || composerLocked || sendingPrompt} aria-label={sendingPrompt ? 'Submitting input' : shellMode ? 'Run command' : inspectionMode ? 'Submit terminal text' : 'Send prompt'} onclick={sendPrompt}>{sendingPrompt ? '…' : '➤'}</Button>
       <input bind:this={fileInput} type="file" accept="image/*" multiple hidden onchange={(event) => { void filesSelected(event.currentTarget.files || []); event.currentTarget.value = ''; }} />
     </div>
     {#if uploadStatus}<p class:error={uploadError} class="upload-status" role="status">{uploadStatus}</p>{/if}

@@ -285,6 +285,7 @@ textarea { min-height: 6.5rem; resize: vertical; }
 .status-primary { background: var(--primary); }
 .status-muted { background: var(--muted); }
 .status-dot.hollow { background: transparent; border: 1.5px solid var(--muted); }
+.shell-icon { color: var(--muted); flex: 0 0 auto; height: 1rem; width: 1rem; }
 
 .empty-state { color: var(--muted); padding: 3rem 1rem; text-align: center; }
 .empty-state h2 { color: var(--foreground); font-size: 1.05rem; }

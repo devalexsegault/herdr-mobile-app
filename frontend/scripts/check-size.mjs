@@ -63,7 +63,9 @@ import { constants, gzipSync } from 'node:zlib';
 // Raised from 156 KiB for Codex model/effort/mode cards and question recovery.
 // The live menu parser, selector state and editable question fallback add
 // approximately 2.8 KiB gzip to the previous build's 159,495 B total.
-const limitKiB = 159;
+// Raised from 159 KiB for shell panes: the home screen's Terminals section and
+// the terminal view's shell mode overflow a ceiling that had 18 B left.
+const limitKiB = 160;
 const limit = limitKiB * 1024;
 const root = resolve(process.argv[2] || 'dist');
 const files = ['index.html', 'assets/app.js', 'assets/app.css'];

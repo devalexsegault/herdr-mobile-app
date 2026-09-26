@@ -1096,6 +1096,36 @@ test('centers plan keys and enables text only for the terminal editor', async ({
   await expect(page.getByRole('button', { name: 'Approve once' })).toBeHidden();
 });
 
+test('opens a plain shell pane from home and runs a command in it', async ({ page }) => {
+  await boot(page, [fedora]);
+  await expect.poll(() => socketCount(page)).toBe(1);
+  await handshake(page, 0, { capabilities: ['slash_commands'] });
+  await server(page, 0, {
+    type: 'agents',
+    agents: [
+      { pane_id: 'w1:p1', status: 'working', project: 'relay', agent: 'codex' },
+      { pane_id: 'w1:p2', status: '', shell: true, project: 'relay', tab_label: 'build', cwd: '/work/relay' },
+    ],
+  });
+  await expect(page.getByRole('heading', { name: 'Terminals' })).toBeVisible();
+  await page.getByRole('button', { name: 'Open terminal build on Fedora' }).click();
+  await server(page, 0, {
+    type: 'pane_content', pane_id: 'w1:p2', format: 'plain', content: 'me@fedora:/work/relay$ ',
+  });
+  const input = page.getByRole('combobox', { name: 'Command' });
+  await expect(input).toBeEnabled();
+  await input.fill('/usr/bin/make check');
+  await expect(page.getByRole('listbox')).toBeHidden();
+  await page.getByRole('button', { name: 'Run command' }).click();
+  await expect.poll(async () => (await commands(page))
+    .filter((command) => command.type === 'send_text' || command.type === 'send_keys')
+    .map((command) => ({ type: command.type, pane_id: command.pane_id, text: command.text, keys: command.keys }))).toEqual([
+      { type: 'send_text', pane_id: 'w1:p2', text: '/usr/bin/make check', keys: undefined },
+      { type: 'send_keys', pane_id: 'w1:p2', text: undefined, keys: ['Enter'] },
+    ]);
+  expect((await commands(page)).some((command) => command.type === 'list_slash_commands')).toBe(false);
+});
+
 test('shows inventory failure instead of zero agents and recovers without reconnecting', async ({ page }) => {
   await boot(page, [fedora]);
   await expect.poll(() => socketCount(page)).toBe(1);

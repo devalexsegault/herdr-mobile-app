@@ -227,6 +227,33 @@ describe('relay command store', () => {
     expect(relayStore.sendRaw(relayId, { type: 'refresh_agents' })).toBe(false);
   });
 
+  it('publishes panes without an agent as shells, apart from agents', () => {
+    const socket = MockWebSocket.instances.at(-1)!;
+    socket.open();
+    socket.message({
+      type: 'push_config', protocol: 2, version: 'abc123', host: 'fedora', capabilities: [], agent_profiles: [],
+    });
+    socket.message({
+      type: 'agents',
+      agents: [
+        { pane_id: 'w1:p1', status: 'working', agent: 'claude' },
+        { pane_id: 'w1:p2', status: '', shell: true, cwd: '/src/relay' },
+      ],
+    });
+    expect(get(relayStore.agents).map((agent) => agent.raw_pane_id)).toEqual(['w1:p1']);
+    expect(get(relayStore.shells).map((shell) => shell.raw_pane_id)).toEqual(['w1:p2']);
+
+    socket.message({
+      type: 'agents',
+      agents: [
+        { pane_id: 'w1:p1', status: 'working', agent: 'claude' },
+        { pane_id: 'w1:p2', status: 'idle', agent: 'codex' },
+      ],
+    });
+    expect(get(relayStore.agents).map((agent) => agent.raw_pane_id)).toEqual(['w1:p1', 'w1:p2']);
+    expect(get(relayStore.shells)).toEqual([]);
+  });
+
   it('acquires and releases validated pane-size leases for capable relays', async () => {
     const socket = MockWebSocket.instances.at(-1)!;
     socket.open();
