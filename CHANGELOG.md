@@ -3,6 +3,18 @@
 Notable user-facing changes to Herdr Mobile Relay are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
+## [0.20.17] - 2026-09-26
+
+### Added
+
+- Panes that no agent occupies appear under **Terminals** on the home screen.
+  Opening one shows only the terminal: the input field runs a command in the
+  shell, and the key bar sends Esc, Tab, Ctrl combinations and arrows. Shell
+  panes never notify and never count as agents.
+- Codex conversations show recorded messages, tool activity and the latest
+  plan. Agent settings open Codex's model, reasoning and permission pickers,
+  and detected menus render in the chat with navigation controls.
+
 ## [0.20.16] - 2026-09-04
 
 ### Changed
