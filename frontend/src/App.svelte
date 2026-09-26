@@ -171,6 +171,7 @@
     const state = group === 'working' ? 'working' : group === 'done' ? 'finished' : group === 'ready' ? 'idle' : group === 'blocked' || group === 'attention' ? 'needs you' : '';
     return [activeAgent.project, activeAgent.herdr_session, activeAgent.agent, state].filter(Boolean).join(' · ');
   });
+  const agentWorking = $derived(Boolean(activeAgent && agentStatusGroup(activeAgent) === 'working'));
   const headerIndicator = $derived.by(() => {
     if (!activeAgent) return {
       tone: inventoryUnavailable || inventoryLoading ? 'warning' : connected ? 'success' : connecting ? 'warning' : 'danger',
@@ -521,7 +522,7 @@
 </script>
 
 <div class="app-shell" class:tabbed={activeTab !== null}>
-  <header class="app-header" class:home-header={activeTab !== null}>
+  <header class="app-header" class:home-header={activeTab !== null} class:agent-working={agentWorking}>
     {#if !activeTab}
       <Button variant="ghost" size="icon" aria-label="Back" onclick={closeCurrentView}>
         <svg class="back-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">

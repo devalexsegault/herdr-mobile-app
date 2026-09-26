@@ -636,6 +636,12 @@
           </article>
         {/each}
         {#if mode === 'conversation' && latestPlan && !query.trim()}<ConversationPlan plan={latestPlan} />{/if}
+        {#if working && !query.trim()}
+          <div class="conversation-working" role="status">
+            <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            {String(agent.agent || '').trim() || displayName(agent)} is working…
+          </div>
+        {/if}
       </div>
     </section>
   {/if}

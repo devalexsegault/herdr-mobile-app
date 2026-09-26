@@ -3,6 +3,15 @@
 Notable user-facing changes to Herdr Mobile Relay are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
+## [0.20.18] - 2026-09-26
+
+### Added
+
+- A working agent is visible at a glance: its status dot breathes in every
+  list, a thin bar sweeps under the header while its chat or terminal is open,
+  and the chat ends with an animated "is working…" line until the turn ends.
+  Reduced-motion settings keep a still bar and dots instead.
+
 ## [0.20.17] - 2026-09-26
 
 ### Added

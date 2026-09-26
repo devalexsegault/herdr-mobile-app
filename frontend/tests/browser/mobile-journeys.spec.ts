@@ -1126,6 +1126,19 @@ test('opens a plain shell pane from home and runs a command in it', async ({ pag
   expect((await commands(page)).some((command) => command.type === 'list_slash_commands')).toBe(false);
 });
 
+test('marks a working agent in the header until its turn ends', async ({ page }) => {
+  await boot(page, [fedora]);
+  await expect.poll(() => socketCount(page)).toBe(1);
+  await handshake(page, 0);
+  const working = { pane_id: 'w1:p1', status: 'working', project: 'relay', agent: 'claude' };
+  await server(page, 0, { type: 'agents', agents: [working] });
+  await page.getByRole('button', { name: 'Open relay on Fedora' }).click();
+  const header = page.locator('header.app-header');
+  await expect(header).toHaveClass(/agent-working/);
+  await server(page, 0, { type: 'agents', agents: [{ ...working, status: 'idle' }] });
+  await expect(header).not.toHaveClass(/agent-working/);
+});
+
 test('shows inventory failure instead of zero agents and recovers without reconnecting', async ({ page }) => {
   await boot(page, [fedora]);
   await expect.poll(() => socketCount(page)).toBe(1);

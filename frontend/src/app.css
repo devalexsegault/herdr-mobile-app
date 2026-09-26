@@ -205,6 +205,24 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   backdrop-filter: blur(14px);
 }
 .app-header nav { display: flex; gap: .15rem; margin-left: auto; }
+/* An open agent that is working sweeps a thin bar along the header's edge, so
+   the turn stays visible while reading the chat or the terminal. */
+.app-header.agent-working::after {
+  animation: working-sweep 1.4s ease-in-out infinite;
+  background: linear-gradient(90deg, transparent, var(--primary), transparent);
+  bottom: -1px;
+  content: "";
+  height: 2px;
+  left: 0;
+  position: absolute;
+  width: 40%;
+}
+.conversation-working { align-items: center; color: var(--muted); display: flex; font-size: .85rem; gap: .5rem; padding: .5rem .25rem; }
+.typing-dots { display: inline-flex; gap: .2rem; }
+.typing-dots i { animation: working-pulse 1.2s ease-in-out infinite; background: var(--primary); border-radius: 50%; height: .4rem; width: .4rem; }
+.typing-dots i:nth-child(2) { animation-delay: .2s; }
+.typing-dots i:nth-child(3) { animation-delay: .4s; }
+@keyframes working-sweep { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
 /* Terminal view carries five controls beside the title on a 390px line, so the
    header's own buttons run tighter than the 2.65rem default to leave the agent
    name readable. Still a 34px target. */
@@ -285,6 +303,9 @@ textarea { min-height: 6.5rem; resize: vertical; }
 .status-primary { background: var(--primary); }
 .status-muted { background: var(--muted); }
 .status-dot.hollow { background: transparent; border: 1.5px solid var(--muted); }
+/* Primary is the working tone: the dot breathes while an agent runs a turn. */
+.status-dot.status-primary { animation: working-pulse 1.6s ease-in-out infinite; }
+@keyframes working-pulse { 50% { opacity: .35; transform: scale(.8); } }
 .shell-icon { color: var(--muted); flex: 0 0 auto; height: 1rem; width: 1rem; }
 
 .empty-state { color: var(--muted); padding: 3rem 1rem; text-align: center; }
@@ -1051,6 +1072,8 @@ textarea { min-height: 6.5rem; resize: vertical; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+  .status-dot.status-primary, .conversation-working i { animation: none; }
+  .app-header.agent-working::after { animation: none; left: 0; width: 100%; }
 }
 
 /* --- Tabbed shell -------------------------------------------------------
