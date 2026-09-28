@@ -1,0 +1,27 @@
+[0m[38;2;153;153;153m← [0m[38;2;0;0;0m[48;2;177;185;249m ☐ Action [0m ☐ Connexion  ☐ Rafraîch.  ✔ Submit  →
+
+[0m[2m│ [0m[1m[38;2;255;255;255mQuelle action rapide veux-tu voir en premier quand tu ouvres une session d'agent sur ton téléphone ?[0m
+
+[0m[38;2;177;185;249m❯ [0m[38;2;153;153;153m1. [0m[38;2;177;185;249mRépondre[0m
+     [0m[38;2;153;153;153mUn champ de saisie prêt à l'emploi pour envoyer tout de suite une réponse à l'agent.[0m
+  [0m[38;2;153;153;153m2. [0mApprouver
+     [0m[38;2;153;153;153mDes boutons pour accepter ou refuser en un geste l'action proposée par l'agent.[0m
+  [0m[38;2;153;153;153m3. [0mVoir la sortie
+     [0m[38;2;153;153;153mLe défilement direct vers les dernières lignes affichées dans le terminal de l'agent.[0m
+  [0m[38;2;153;153;153m4. Type something.[0m
+[0m[38;2;153;153;153m──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+  5. Chat about this
+
+[0m[38;2;153;153;153mEnter to select · Tab/Arrow keys to navigate · Esc to cancel[0m
+
+
+
+
+
+
+
+
+
+
+
+[0m[38;2;136;136;136m───────────────────────────────────────────────────────────────────────────────────────────── Test interface AskUserQuestion ─[0m

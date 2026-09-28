@@ -863,7 +863,7 @@ func (s *Server) Run(ctx context.Context) error {
 			}
 			readCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 			paneHerdr, rawPane := s.paneClient(a.PaneID)
-			read, err := paneHerdr.ReadPane(readCtx, rawPane, 80, "ansi")
+			read, err := paneHerdr.ReadPaneRecent(readCtx, rawPane, 80, "ansi")
 			cancel()
 			if err != nil {
 				s.recordSafeError("blocked pane enrichment failed", err)
@@ -1261,7 +1261,7 @@ func (s *Server) enrichBlockedTransition(ctx context.Context, agent *coordinator
 		attemptCtx, cancel := context.WithTimeout(readCtx, 3*time.Second)
 		defer cancel()
 		paneHerdr, rawPane := s.paneClient(agent.PaneID)
-		read, readErr := paneHerdr.ReadPane(attemptCtx, rawPane, 80, "ansi")
+		read, readErr := paneHerdr.ReadPaneRecent(attemptCtx, rawPane, 80, "ansi")
 		return string(read.Content), readErr
 	})
 	if err != nil {

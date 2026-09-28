@@ -551,3 +551,31 @@ func TestSttyDeviceFlagIsPlatformAppropriate(t *testing.T) {
 		t.Fatalf("darwin flag = %q, %v", flag, err)
 	}
 }
+
+func TestSweepStopsRestoringAClosedPane(t *testing.T) {
+	now := time.Unix(100, 0)
+	provider := &fakeProcessInfoProvider{infos: map[string]*herdr.PaneProcessInfo{
+		"pane-1": processInfo("pane-1", 321),
+	}}
+	runner := &fakeCommandRunner{
+		ttyByPID: map[int]string{321: "pts/7"},
+		sizes:    map[string]terminalSize{"/dev/pts/7": {rows: 37, columns: 132}},
+	}
+	manager := testManager(provider, runner, func() time.Time { return now })
+	if _, _, err := manager.Acquire(context.Background(), "client-1", "pane-1", 84, 0); err != nil {
+		t.Fatalf("Acquire() error = %v", err)
+	}
+	// The pane closes: its tty disappears while the lease runs out.
+	delete(runner.sizes, "/dev/pts/7")
+	now = now.Add(LeaseTTL + time.Second)
+
+	failures := 0
+	for sweep := 0; sweep < maxRestoreFailures+3; sweep++ {
+		if err := manager.SweepExpired(context.Background()); err != nil {
+			failures++
+		}
+	}
+	if failures != maxRestoreFailures {
+		t.Fatalf("restore failed %d times, want %d before giving up", failures, maxRestoreFailures)
+	}
+}

@@ -84,7 +84,13 @@ type paneState struct {
 	appliedColumns  int
 	resizedAt       time.Time
 	leases          map[string]Lease
+	restoreFailures int
 }
+
+// maxRestoreFailures bounds how long an unleased pane keeps being restored:
+// a closed pane's tty is gone for good, and each sweep would only repeat the
+// same error.
+const maxRestoreFailures = 5
 
 type Manager struct {
 	mu       sync.Mutex
@@ -611,6 +617,10 @@ func (m *Manager) restore(ctx context.Context, paneID string, state *paneState) 
 		sttyRows = 0
 	}
 	if err := m.setSize(ctx, state.tty, state.baselineColumns, sttyRows); err != nil {
+		state.restoreFailures++
+		if state.restoreFailures >= maxRestoreFailures {
+			delete(m.panes, paneID)
+		}
 		return err
 	}
 	state.appliedColumns = state.baselineColumns

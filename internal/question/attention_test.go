@@ -1190,3 +1190,28 @@ func attentionFixture(t *testing.T, name string) string {
 	}
 	return string(content)
 }
+
+func TestClaudeMultiQuestionAcceptsSessionTitledRule(t *testing.T) {
+	interaction := Parse(attentionFixture(t, "claude-multi-question-titled-rule.ansi"), "claude")
+	if interaction == nil {
+		t.Fatal("question under a session-titled rule was not recognized")
+	}
+	if interaction.QuestionIndex != 1 || interaction.QuestionTotal != 4 ||
+		!strings.HasPrefix(interaction.Question, "Quelle action rapide veux-tu voir en premier") ||
+		len(interaction.Options) != 3 || interaction.Options[2].Label != "Voir la sortie" {
+		t.Fatalf("interaction = %+v", interaction)
+	}
+}
+
+func TestClaudeMultiQuestionSurvivesNarrowRedraw(t *testing.T) {
+	// 43 columns: the key hint wraps onto a second line, and the redraw of a
+	// question taller than the screen repeats the prompt's last row.
+	interaction := Parse(attentionFixture(t, "claude-multi-question-narrow-redraw.ansi"), "claude")
+	if interaction == nil {
+		t.Fatal("narrow question was not recognized")
+	}
+	want := "Quel mode d'affichage préfères-tu pour la liste des sessions dans l'application mobile Herdr ?"
+	if interaction.Question != want || len(interaction.Options) != 3 || interaction.Options[0].Label != "Liste compacte" {
+		t.Fatalf("interaction = %+v", interaction)
+	}
+}

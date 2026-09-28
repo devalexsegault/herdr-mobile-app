@@ -90,6 +90,7 @@ var (
 	otherPattern           = regexp.MustCompile(`(?i)^(?:type something\.?|type your own answer|none of the above|other)\b`)
 	selectedPattern        = regexp.MustCompile(`\s*[✓✔]\s*$`)
 	columnGapPattern       = regexp.MustCompile(`\s{2,}`)
+	titledRulePattern      = regexp.MustCompile(`^[─━═]{2,}\s+\S.*?\s+[─━═]+\s*$`)
 	chromePattern          = regexp.MustCompile(`(?i)^(?:[\s─━═_—│|◔◑◕●]+|.*\besc to cancel\b|.*\btype to queue\b|[◔◑◕●]\s+(?:shell|bash).*)$`)
 	promptSkipPattern      = regexp.MustCompile(`(?i)^(?:bash command|do you want to proceed\??|would you like to run\b.*|environment:\s*\w+|press enter to confirm\b.*|esc to cancel\b.*)$`)
 	commandPattern         = regexp.MustCompile(`^\s*[$>❯›]\s+(.+?)\s*$`)
@@ -204,7 +205,17 @@ func LayoutHint(text string) bool {
 		if hasCodexHeader && strings.EqualFold(strings.TrimSpace(line), "esc to interrupt") {
 			continue
 		}
-		if line != "" && strings.Trim(line, "─━═_—│| ") != "" {
+		// A narrow terminal wraps the key hint ("Enter to select · Tab/Arrow
+		// keys to" / "navigate · Esc to cancel"); its tail is still chrome.
+		if chromePattern.MatchString(line) {
+			continue
+		}
+		// Claude Code titles the rule under the question with the session
+		// name; a rule clipped mid-glyph ends in U+FFFD. Both are chrome.
+		if titledRulePattern.MatchString(line) {
+			continue
+		}
+		if line != "" && strings.Trim(line, "─━═_—│| \uFFFD") != "" {
 			return false
 		}
 	}
@@ -1762,7 +1773,48 @@ func prompt(lines []string, firstOption int) string {
 	if end < 0 {
 		return "Claude Code needs an answer"
 	}
+	// Redrawing a question taller than the screen cannot erase the rows that
+	// scrolled away, so the prompt's tail reappears below its full copy.
+	if fullStart, fullEnd, ok := promptBlockAbove(lines, start); ok &&
+		endsWithLines(lines[fullStart:fullEnd+1], lines[start:end+1]) {
+		start, end = fullStart, fullEnd
+	}
 	return compact(strings.Join(lines[start:end+1], " "), 1000)
+}
+
+// promptBlockAbove finds the run of prompt lines directly above start,
+// separated from it by blank lines only.
+func promptBlockAbove(lines []string, start int) (int, int, bool) {
+	index := start - 1
+	for index >= 0 && strings.TrimSpace(lines[index]) == "" {
+		index--
+	}
+	if index == start-1 || index < 0 {
+		return 0, 0, false
+	}
+	end := index
+	for index >= 0 {
+		line := lines[index]
+		if strings.TrimSpace(line) == "" || submitPattern.MatchString(line) || chatPattern.MatchString(line) ||
+			(strings.Contains(line, "Submit") && strings.Contains(line, "→")) {
+			break
+		}
+		index--
+	}
+	return index + 1, end, index+1 <= end
+}
+
+func endsWithLines(full, tail []string) bool {
+	if len(tail) == 0 || len(tail) > len(full) {
+		return false
+	}
+	offset := len(full) - len(tail)
+	for index, line := range tail {
+		if strings.TrimSpace(full[offset+index]) != strings.TrimSpace(line) {
+			return false
+		}
+	}
+	return true
 }
 
 func claudePosition(text string) (int, int) {

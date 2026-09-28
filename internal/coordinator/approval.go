@@ -90,7 +90,7 @@ func (d *Dispatcher) handleApproval(ctx context.Context, receivedAt time.Time, r
 			len(current.Options) != payload.Total {
 			return EffectResult{Result: d.fail(requestID, "approval", paneID, "This approval request is no longer current")}
 		}
-		read, err := d.herdrFor(paneID).ReadPane(effectCtx, rawID(paneID), 80, "ansi")
+		read, err := d.herdrFor(paneID).ReadPaneRecent(effectCtx, rawID(paneID), 80, "ansi")
 		if err != nil {
 			return EffectResult{Result: d.failErr(requestID, "approval", paneID, err)}
 		}
@@ -310,7 +310,7 @@ func (d *Dispatcher) submitQuestion(ctx context.Context, receivedAt time.Time, r
 		if !ok || (current.Status != "blocked" && current.Status != "done") {
 			return EffectResult{Result: d.fail(requestID, action, paneID, "The question changed before the answer was applied")}
 		}
-		read, err := d.herdrFor(paneID).ReadPane(effectCtx, rawID(paneID), 80, "ansi")
+		read, err := d.herdrFor(paneID).ReadPaneRecent(effectCtx, rawID(paneID), 80, "ansi")
 		if err != nil {
 			return EffectResult{Result: d.failErr(requestID, action, paneID, err)}
 		}
@@ -527,7 +527,7 @@ func (d *Dispatcher) watchQuestion(
 				d.finishQuestionWatch(ledgerKey, generation, requestID, action, paneID, original, navigation, nil)
 				return
 			}
-			read, err := d.herdrFor(paneID).ReadPane(ctx, rawID(paneID), 80, "ansi")
+			read, err := d.herdrFor(paneID).ReadPaneRecent(ctx, rawID(paneID), 80, "ansi")
 			if err != nil {
 				continue
 			}

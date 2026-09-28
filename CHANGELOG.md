@@ -3,6 +3,21 @@
 Notable user-facing changes to Herdr Mobile Relay are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
+## [0.20.19] - 2026-09-28
+
+### Fixed
+
+- Claude's interactive questions are recognized again. Claude Code now draws a
+  rule titled with the session name under the question, which made the relay
+  reject every multi-question prompt, so answers and navigation between
+  questions failed.
+- Questions stay readable in a narrow pane: the wrapped key hint and the
+  prompt repeated by a redraw no longer hide the question, and the relay reads
+  the question rows as displayed instead of rejoining them, which merged
+  options together.
+- The relay stops retrying, every second, to restore the size of a pane that
+  was closed while the phone had it open.
+
 ## [0.20.18] - 2026-09-26
 
 ### Added
