@@ -116,6 +116,10 @@ func (p *claudeProvider) Discover(ctx DiscoverContext) ([]Command, bool) {
 	apply(cmds, supp)
 	truncated = truncated || trunc
 
+	cmds, supp, trunc = claudePluginCommands(ctx, &budget)
+	apply(cmds, supp)
+	truncated = truncated || trunc
+
 	apply(nil, claudeSkillOverrides(ctx))
 	commands := make([]Command, 0, len(order))
 	for _, name := range order {

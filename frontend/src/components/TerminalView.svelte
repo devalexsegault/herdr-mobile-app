@@ -236,7 +236,11 @@
   const filteredSlashCommands = $derived.by(() => {
     if (slashQuery === null) return [];
     if (!slashQuery) return slashCatalog.commands;
-    return slashCatalog.commands.filter((entry) => entry.command.slice(1).toLocaleLowerCase().startsWith(slashQuery));
+    // Plugin skills are namespaced ("/plugin:skill"); the skill name alone matches too.
+    return slashCatalog.commands.filter((entry) => {
+      const name = entry.command.slice(1).toLocaleLowerCase();
+      return name.startsWith(slashQuery) || name.slice(name.lastIndexOf(':') + 1).startsWith(slashQuery);
+    });
   });
   const effectiveSlashIndex = $derived(filteredSlashCommands.length
     ? Math.min(activeSlashIndex, filteredSlashCommands.length - 1)

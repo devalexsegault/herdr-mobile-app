@@ -3,6 +3,15 @@
 Notable user-facing changes to Herdr Mobile Relay are documented here. The
 project follows [Semantic Versioning](https://semver.org/).
 
+## [0.20.20] - 2026-10-04
+
+### Added
+
+- Typing "/" in a Claude chat or terminal lists the skills and commands of the
+  Claude Code plugins enabled for the project, named as Claude invokes them
+  ("/aidd-context:00-onboard"). A plugin installed for one project only shows
+  in that project, and the skill name alone finds a namespaced skill.
+
 ## [0.20.19] - 2026-09-28
 
 ### Fixed

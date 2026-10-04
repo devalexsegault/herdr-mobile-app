@@ -69,12 +69,14 @@ func ompExtensionSkillDirs(ctx DiscoverContext, settings ompSkillSettings) []omp
 }
 
 type claudeMarketplaceRegistry struct {
-	Plugins map[string][]struct {
-		InstallPath string `json:"installPath"`
-		Enabled     *bool  `json:"enabled"`
-		Scope       string `json:"scope"`
-		ProjectPath string `json:"projectPath"`
-	} `json:"plugins"`
+	Plugins map[string][]claudePluginInstallRecord `json:"plugins"`
+}
+
+type claudePluginInstallRecord struct {
+	InstallPath string `json:"installPath"`
+	Enabled     *bool  `json:"enabled"`
+	Scope       string `json:"scope"`
+	ProjectPath string `json:"projectPath"`
 }
 
 func claudeMarketplaceExtensions(ctx DiscoverContext, registryPath, source string) []ompExtensionDir {
