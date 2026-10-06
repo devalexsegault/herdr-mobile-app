@@ -21,6 +21,7 @@ type SnapshotColumn struct {
 	Position           int64   `json:"position"`
 	Trigger            string  `json:"trigger"`
 	FreshSession       bool    `json:"fresh_session"`
+	Parallel           bool    `json:"parallel"`
 	HarnessOverride    *string `json:"harness_override"`
 	ModelOverride      *string `json:"model_override"`
 	EffortOverride     *string `json:"effort_override"`
@@ -75,6 +76,7 @@ func FromSnapshot(name, description string, columns []SnapshotColumn) Template {
 			Permission:     deref(column.PermissionOverride),
 			TimeoutMinutes: column.TimeoutMinutes,
 			FreshSession:   column.FreshSession,
+			Parallel:       column.Parallel,
 		}
 		if column.OnSuccessColumnID != nil {
 			entry.OnSuccess = names[*column.OnSuccessColumnID]
@@ -216,6 +218,7 @@ func createParams(boardID int64, column Column) map[string]any {
 		"name":          column.Name,
 		"trigger":       column.Trigger,
 		"fresh_session": column.FreshSession,
+		"parallel":      column.Parallel,
 	}
 	setIfPresent(params, "system_prompt", column.SystemPrompt)
 	setIfPresent(params, "harness_override", column.Harness)
@@ -236,6 +239,7 @@ func updateParams(id int64, column Column) map[string]any {
 		"name":                column.Name,
 		"trigger":             column.Trigger,
 		"fresh_session":       column.FreshSession,
+		"parallel":            column.Parallel,
 		"system_prompt":       nullable(column.SystemPrompt),
 		"harness_override":    nullable(column.Harness),
 		"model_override":      nullable(column.Model),

@@ -240,3 +240,23 @@ func TestBriefsCarryFormatRulesAndTargets(t *testing.T) {
 		}
 	}
 }
+
+func TestParallelFlagFlowsThroughSnapshotAndParams(t *testing.T) {
+	template := FromSnapshot("P", "", []SnapshotColumn{
+		{ID: 1, Name: "Research", Position: 0, Trigger: "auto", Parallel: true},
+		{ID: 2, Name: "Implement", Position: 1, Trigger: "auto"},
+	})
+	if !template.Columns[0].Parallel || template.Columns[1].Parallel {
+		t.Fatalf("snapshot parallel flags = %+v", template.Columns)
+	}
+	if got := createParams(1, template.Columns[0])["parallel"]; got != true {
+		t.Fatalf("create parallel = %v", got)
+	}
+	if got := updateParams(1, template.Columns[1])["parallel"]; got != false {
+		t.Fatalf("update must send an explicit false, got %v", got)
+	}
+	data, err := json.Marshal(template.Columns[1])
+	if err != nil || strings.Contains(string(data), "parallel") {
+		t.Fatalf("a serial column omits parallel from the file: %s %v", data, err)
+	}
+}

@@ -33,6 +33,7 @@ type Column struct {
 	Permission     string `json:"permission,omitempty"`
 	TimeoutMinutes *int64 `json:"timeout_minutes,omitempty"`
 	FreshSession   bool   `json:"fresh_session,omitempty"`
+	Parallel       bool   `json:"parallel,omitempty"`
 	OnSuccess      string `json:"on_success,omitempty"`
 	OnFail         string `json:"on_fail,omitempty"`
 }

@@ -15,7 +15,7 @@ const boardRules = `Board rules (herdr-board):
 - A column with trigger "auto" starts an agent on every card that enters it; "manual" columns are hand-managed stages (Backlog, Ready, Blocked, Human Review, Done).
 - An auto column's system_prompt is the whole brief its agent gets, on top of the card's own description. Write it in the second person, say what the stage must produce, how it reports (board comment then board done --outcome ok|fail), and what it must never do.
 - on_success and on_fail name the columns a card moves to when the run reports ok or fail. Every auto column should define both; manual columns usually define neither.
-- Overrides: harness (claude, codex, ...), model, effort (low|medium|high), permission (for Claude Code: default, acceptEdits, plan, bypassPermissions), timeout_minutes, fresh_session (true starts each run in a new session).
+- Overrides: harness (claude, codex, ...), model, effort (low|medium|high), permission (for Claude Code: default, acceptEdits, plan, bypassPermissions), timeout_minutes, fresh_session (true starts each run in a new session), parallel (true lets cards of the same workspace run this column at once, each in its own tab; leave it off for stages that edit the working tree, such as implementation, so those stay serialized).
 - Choose model and effort per stage: opus with high effort where judgement is expensive (design, review, arbitration), sonnet for prescribed execution, haiku for mechanical steps. Do not give every stage the same setting without a reason.
 - Keep column names short and distinct; they are what people tap on a phone.`
 
@@ -29,7 +29,7 @@ const templateFormat = `Template file format (JSON, one file per template):
     },
     {
       "name": "Execute", "trigger": "auto", "system_prompt": "...", "harness": "claude", "model": "sonnet", "effort": "medium",
-      "permission": "acceptEdits", "timeout_minutes": 60, "fresh_session": true, "on_success": "Review", "on_fail": "Blocked"
+      "permission": "acceptEdits", "timeout_minutes": 60, "fresh_session": true, "parallel": false, "on_success": "Review", "on_fail": "Blocked"
     }
   ]
 }

@@ -47,6 +47,7 @@ export interface BoardColumn {
   position: number;
   trigger: string;
   fresh_session: boolean;
+  parallel?: boolean;
   harness_override: string | null;
   model_override: string | null;
   effort_override: string | null;
@@ -146,6 +147,7 @@ export interface BoardTemplateColumn {
   permission?: string;
   timeout_minutes?: number;
   fresh_session?: boolean;
+  parallel?: boolean;
   on_success?: string;
   on_fail?: string;
 }
